@@ -1,3 +1,15 @@
+# Data
+/data/
+
+# Mac OS-specific storage files
+.DS_Store
+
+# vim
+*.swp
+*.swo
+
+## https://github.com/github/gitignore/blob/e8554d85bf62e38d6db966a50d2064ac025fd82a/Python.gitignore
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -68,8 +80,8 @@ instance/
 # Scrapy stuff:
 .scrapy
 
-# Sphinx documentation
-docs/_build/
+# MkDocs documentation
+docs/site/
 
 # PyBuilder
 .pybuilder/
@@ -116,6 +128,11 @@ ipython_config.py
 .pdm.toml
 .pdm-python
 .pdm-build/
+
+# pixi
+#   pixi.lock should be committed to version control for reproducibility
+#   .pixi/ contains the environments and should not be committed
+.pixi/
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
 __pypackages__/
@@ -172,10 +189,3 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-
-# Cursor  
-#  Cursor is an AI-powered code editor.`.cursorignore` specifies files/directories to 
-#  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
-#  refer to https://docs.cursor.com/context/ignore-files
-.cursorignore
-.cursorindexingignore
