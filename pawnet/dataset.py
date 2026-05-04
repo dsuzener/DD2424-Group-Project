@@ -45,7 +45,7 @@ def main(
     )
 
     train_size = int(train_size * len(dataset))
-    train, val = random_split(dataset, [train_size, len(dataset) - train_size])
+    train, val = random_split(dataset, [train_size, len(dataset) - train_size]) # TODO: stratify train/val split
 
     train_loader = DataLoader(train, batch_size=32, shuffle=True)
     val_loader = DataLoader(val, batch_size=32, shuffle=False)
