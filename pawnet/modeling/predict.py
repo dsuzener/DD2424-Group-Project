@@ -34,13 +34,12 @@ def main(
 
     preprocess = weights.transforms()
 
-
     img = Image.open("data/raw/oxford-iiit-pet/images/Siamese_71.jpg").convert("RGB")
     input_tensor = preprocess(img).unsqueeze(0)
-    
+
     with torch.no_grad():
         output = model(input_tensor)
-    
+
     probs = torch.nn.functional.softmax(output[0], dim=0)
 
     class_id = int(probs.argmax().item())
