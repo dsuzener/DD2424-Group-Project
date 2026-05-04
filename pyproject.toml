@@ -22,6 +22,7 @@ dependencies = [
     "pytest",
     "python-dotenv",
     "ruff",
+    "torchvision>=0.26.0",
     "tqdm",
     "typer",
 ]
