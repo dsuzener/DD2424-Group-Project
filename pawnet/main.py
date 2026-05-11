@@ -5,12 +5,13 @@ from pawnet.modeling.predict import main as predict
 def main():
     print("Hello from dd2424-group-project!")
 
-    train_loader, val_loader = dataset()
+    test_loader = dataset(split="test")
+    train_loader, val_loader = dataset(train_size=1.0)
 
-    # train(train_loader=train_loader)
-    predict(val_loader=val_loader)
+    train(train_loader=train_loader)
+    predict(val_loader=test_loader)
 
 
-
+ 
 if __name__ == "__main__":
     main()

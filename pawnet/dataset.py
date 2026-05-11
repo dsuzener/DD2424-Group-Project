@@ -28,6 +28,7 @@ def main(
     split: str = "trainval",
     target_types: str = "binary-category",
     train_size: float = 0.8,
+    batch_size: int = 32,
 ):
 
     # Need to change some things below probably
@@ -43,15 +44,21 @@ def main(
     dataset = CustomDataset(
         root=data_path, split=split, target_types=target_types, transform=transform, download=True
     )
+    if split == "trainval":
+        train_size = int(train_size * len(dataset))
+        train, val = random_split(dataset, [train_size, len(dataset) - train_size]) # TODO: stratify train/val split
 
-    train_size = int(train_size * len(dataset))
-    train, val = random_split(dataset, [train_size, len(dataset) - train_size]) # TODO: stratify train/val split
+        train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val, batch_size=batch_size, shuffle=False)
+        logger.success("Train and validation datasets ready.")
 
-    train_loader = DataLoader(train, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val, batch_size=32, shuffle=False)
-    logger.success("Train and validation datasets ready.")
+        return train_loader, val_loader
+    else:
+        test_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        logger.success("Test dataset ready.")
 
-    return train_loader, val_loader
+        return test_loader
+
 
 
 if __name__ == "__main__":

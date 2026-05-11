@@ -9,7 +9,7 @@ from pawnet.config import MODELS_DIR, PROCESSED_DATA_DIR
 import torch
 import torch.nn as nn
 
-from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
+from torchvision.models import efficientnet_b0
 from PIL import Image
 
 app = typer.Typer()
@@ -28,25 +28,30 @@ def main(
         2
     )
     model.load_state_dict(torch.load(model_path, weights_only=True))
-    weights = EfficientNet_B0_Weights.DEFAULT
     model.eval()
 
-
+    num_correct = 0
+    num_wrong = 0
     for images, labels in tqdm(val_loader, desc="Predicting"):
         with torch.no_grad():
             output = model(images)
 
-        probs = torch.nn.functional.softmax(output[0], dim=0)
+        for i in range(len(output)):
+            probs = torch.nn.functional.softmax(output[i], dim=0)
 
-        class_id = int(probs.argmax().item())
-        label = weights.meta["categories"][class_id]
-        if label == 'tench':
-            label = 'cat'
-        else:
-            label = 'dog'
-        score = probs[class_id].item()
+            class_id = int(probs.argmax().item())
+            if class_id == 0:
+                label = 'cat'
+            else:
+                label = 'dog'
+            score = probs[class_id].item()
 
-        print(label, score)
+            if not class_id == labels[i]:
+                num_wrong += 1
+            else:
+                num_correct += 1
+
+    print(f"Correct: {num_correct} / {num_correct + num_wrong} = {num_correct/(num_correct + num_wrong)}")
 
 
 if __name__ == "__main__":
