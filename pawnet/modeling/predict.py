@@ -25,7 +25,7 @@ def main(
     model_path: Path = MODELS_DIR / "model.pkl",
     predictions_path: Path = PROCESSED_DATA_DIR / "test_predictions.csv",
 ):
-    model, _ = get_model(model_version=model_version, use_weights=True)
+    model, _ = get_model(model_version=model_version, use_weights=False)
     model.classifier[1] = nn.Linear(cast(nn.Linear, model.classifier[1]).in_features, 2)
     model.load_state_dict(torch.load(model_path, weights_only=True))
     model.eval()
