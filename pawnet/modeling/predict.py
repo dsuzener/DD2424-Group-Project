@@ -9,7 +9,7 @@ from pawnet.config import MODELS_DIR, PROCESSED_DATA_DIR
 import torch
 import torch.nn as nn
 
-from torchvision.models import efficientnet_b0
+from torchvision import models
 from PIL import Image
 
 app = typer.Typer()
@@ -18,11 +18,19 @@ app = typer.Typer()
 @app.command()
 def main(
     val_loader,
+    model_version: int = 0,
     features_path: Path = PROCESSED_DATA_DIR / "test_features.csv",
     model_path: Path = MODELS_DIR / "model.pkl",
     predictions_path: Path = PROCESSED_DATA_DIR / "test_predictions.csv",
 ):
-    model = efficientnet_b0()
+    match model_version:
+        case 0:
+            model = models.efficientnet_b0()
+        case 1:
+            model = models.efficientnet_b1()
+        case _:
+            logger.error(f"Model version {model_version} not recognized.")
+            return
     model.classifier[1] = nn.Linear(
         cast(nn.Linear, model.classifier[1]).in_features,
         2
