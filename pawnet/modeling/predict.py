@@ -12,6 +12,8 @@ import torch.nn as nn
 from torchvision import models
 from PIL import Image
 
+from pawnet.utils import get_model
+
 app = typer.Typer()
 
 
@@ -23,43 +25,37 @@ def main(
     model_path: Path = MODELS_DIR / "model.pkl",
     predictions_path: Path = PROCESSED_DATA_DIR / "test_predictions.csv",
 ):
-    match model_version:
-        case 0:
-            model = models.efficientnet_b0()
-        case 1:
-            model = models.efficientnet_b1()
-        case _:
-            logger.error(f"Model version {model_version} not recognized.")
-            return
-    model.classifier[1] = nn.Linear(
-        cast(nn.Linear, model.classifier[1]).in_features,
-        2
-    )
+    model, _ = get_model(model_version=model_version, use_weights=True)
+    model.classifier[1] = nn.Linear(cast(nn.Linear, model.classifier[1]).in_features, 2)
     model.load_state_dict(torch.load(model_path, weights_only=True))
     model.eval()
 
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    model.to(device)
+
     num_correct = 0
-    num_wrong = 0
+    num_total = 0
+
+    all_preds = []
+    all_labels = []
     for images, labels in tqdm(val_loader, desc="Predicting"):
         with torch.no_grad():
-            output = model(images)
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
 
-        for i in range(len(output)):
-            probs = torch.nn.functional.softmax(output[i], dim=0)
+            preds = outputs.argmax(dim=1)
 
-            class_id = int(probs.argmax().item())
-            if class_id == 0:
-                label = 'cat'
-            else:
-                label = 'dog'
-            score = probs[class_id].item()
+            num_correct += (preds == labels).sum().item()
 
-            if not class_id == labels[i]:
-                num_wrong += 1
-            else:
-                num_correct += 1
+            num_total += labels.size(0)
 
-    print(f"Correct: {num_correct} / {num_correct + num_wrong} = {num_correct/(num_correct + num_wrong)}")
+            all_preds.append(preds.cpu())
+
+            all_labels.append(labels.cpu())
+
+    accuracy = num_correct / num_total
+
+    print(f"Accuracy: {accuracy:.4f}")
 
 
 if __name__ == "__main__":
