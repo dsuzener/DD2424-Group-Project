@@ -6,10 +6,10 @@ def main():
     print("Hello from dd2424-group-project!")
 
     test_loader = dataset(split="test")
-    train_loader, val_loader = dataset(train_size=1.0)
+    train_loader, validation_loader = dataset(train_size=0.8)
 
-    train(train_loader=train_loader)
-    predict(val_loader=test_loader)
+    train(train_loader=train_loader, validation_loader=validation_loader, model_version=0)
+    predict(val_loader=test_loader, model_version=0)
 
 
  
