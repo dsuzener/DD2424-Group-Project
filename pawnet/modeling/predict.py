@@ -20,7 +20,7 @@ app = typer.Typer()
 @app.command()
 def main(
     val_loader,
-    model_version: int = 0,
+    model_version: str = "efficientnet_b0",
     features_path: Path = PROCESSED_DATA_DIR / "test_features.csv",
     model_path: Path = MODELS_DIR / "model.pkl",
     predictions_path: Path = PROCESSED_DATA_DIR / "test_predictions.csv",

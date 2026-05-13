@@ -31,7 +31,7 @@ def main(
     target_types: str = "binary-category",
     train_size: float = 0.8,
     batch_size: int = 128,
-    model_version: int = 0,
+    model_version: str = "efficientnet_b0",
 ):
     _, weights = get_model(model_version=model_version, use_weights=True)
 

@@ -4,7 +4,7 @@ from pawnet.modeling.predict import main as predict
 
 
 def main():
-    MODEL_VERSION = 0
+    MODEL_VERSION = 'efficientnet_b0'
     print("Hello from dd2424-group-project!")
 
     test_loader = dataset(split="test", model_version=MODEL_VERSION)

@@ -20,11 +20,11 @@ app = typer.Typer()
 def main(
     train_loader,
     validation_loader,
-    model_version: int = 0,
+    model_version: str = "efficientnet_b0",
     features_path: Path = PROCESSED_DATA_DIR / "features.csv",
     labels_path: Path = PROCESSED_DATA_DIR / "labels.csv",
     model_path: Path = MODELS_DIR / "model.pkl",
-    epochs: int = 50,
+    epochs: int = 1,
 ):
     # Load model and initial weights
     model, _ = get_model(model_version=model_version, use_weights=True)
