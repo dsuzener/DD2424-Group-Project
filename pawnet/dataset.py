@@ -8,6 +8,8 @@ from pawnet.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
 from torchvision import datasets, transforms
 from torch.utils.data import random_split, DataLoader
 
+from pawnet.utils import get_model
+
 
 app = typer.Typer()
 
@@ -28,17 +30,20 @@ def main(
     split: str = "trainval",
     target_types: str = "binary-category",
     train_size: float = 0.8,
-    batch_size: int = 32,
+    batch_size: int = 128,
+    model_version: int = 0,
 ):
+    _, weights = get_model(model_version=model_version, use_weights=True)
 
     # Need to change some things below probably
-    transform = transforms.Compose(
-        [
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ]
-    )
+    # transform = transforms.Compose(
+    #     [
+    #         transforms.Resize((224, 224)),
+    #         transforms.ToTensor(),
+    #         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    #     ]
+    # )
+    transform = weights.transforms()  # type: ignore
 
     logger.info("Loading, preporcessing, and splitting dataset...")
     dataset = CustomDataset(
@@ -46,10 +51,24 @@ def main(
     )
     if split == "trainval":
         train_size = int(train_size * len(dataset))
-        train, val = random_split(dataset, [train_size, len(dataset) - train_size]) # TODO: stratify train/val split
+        train, val = random_split(
+            dataset, [train_size, len(dataset) - train_size]
+        )  # TODO: stratify train/val split
 
-        train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(
+            train,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=4,
+            persistent_workers=True,
+        )
+        val_loader = DataLoader(
+            val,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=4,
+            persistent_workers=True,
+        )
         logger.success("Train and validation datasets ready.")
 
         return train_loader, val_loader
@@ -58,7 +77,6 @@ def main(
         logger.success("Test dataset ready.")
 
         return test_loader
-
 
 
 if __name__ == "__main__":
