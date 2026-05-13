@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import cast
 
@@ -24,7 +25,7 @@ def main(
     features_path: Path = PROCESSED_DATA_DIR / "features.csv",
     labels_path: Path = PROCESSED_DATA_DIR / "labels.csv",
     model_path: Path = MODELS_DIR / "model.pkl",
-    epochs: int = 1,
+    epochs: int = 20,
 ):
     # Load model and initial weights
     model, _ = get_model(model_version=model_version, use_weights=True)
@@ -49,12 +50,14 @@ def main(
     criterion = nn.CrossEntropyLoss(weight=None)  # TODO: add class weights
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
 
+    os.makedirs(f"{model_version}/{model_path}", exist_ok=True)"
+
     # Train model
-    for epoch in range(epochs):
+    for epoch in range(1, epochs + 1):
         model.train()
         total_loss = 0
 
-        for images, labels in tqdm(train_loader, desc=f"Epoch {epoch + 1}/{epochs}"):
+        for images, labels in tqdm(train_loader, desc=f"Epoch {epoch}/{epochs}"):
             images, labels = images.to(device), labels.to(device)
 
             # Forward
@@ -90,7 +93,13 @@ def main(
 
         val_acc = num_correct / num_total
 
-        print(f"Epoch {epoch + 1}/{epochs} loss={avg_loss:.4f} val_acc={val_acc:.4f}")
+        print(f"Epoch {epoch}/{epochs} loss={avg_loss:.4f} val_acc={val_acc:.4f}")
+
+        if epoch % 10 == 0:
+            model_checkpoint_path = MODELS_DIR / f"{model_version}_epoch_{epoch}.pkl"
+            print(f"Saving model after epoch {epoch} to checkpoint {model_checkpoint_path}...")
+            torch.save(model.state_dict(), model_checkpoint_path)
+            logger.success(f"Model checkpoint trained and saved to {model_checkpoint_path}.")
 
     # Save trained model
     torch.save(model.state_dict(), model_path)
