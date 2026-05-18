@@ -1,4 +1,6 @@
 import os
+import csv
+import threading
 from pathlib import Path
 from typing import cast
 
@@ -14,6 +16,7 @@ import torchvision.models as models
 import torch.nn as nn
 
 from pawnet.utils import get_model
+from pawnet.modeling.run_paths import RunConfig, ensure_run_dir, find_latest_checkpoint
 
 app = typer.Typer()
 
@@ -28,22 +31,36 @@ def main(
     epochs: int = 20,
     target_types: str = "binary-category",
     num_layers: int = 0,
+    train_size: float = 0.80,
+    batch_size: int = 128,
+    stratify: bool = True,
+    gradual_unfreezing: bool = False,
 ):
-    model_path = MODELS_DIR / f"{model_version}/model.pkl"
-    model_checkpoint_paths = glob.glob(str(MODELS_DIR / f"{model_version}/epoch_*.pkl"))
-    max_epoch_num = 0
-    if model_checkpoint_paths:
-        max_epoch_num = max(
-            [int(Path(path).stem.split("_")[1]) for path in model_checkpoint_paths]
-        )
-    latest_epoch_checkpoint_path = MODELS_DIR / f"{model_version}/epoch_{max_epoch_num}.pkl"
+    # config stuff
+    # if changing the config, change the parameters of this function too!
+    run_config = RunConfig(
+        model_version=model_version,
+        target_types=target_types,
+        train_size=train_size,
+        batch_size=batch_size,
+        stratify=stratify,
+        num_layers=num_layers,
+        gradual_unfreezing=gradual_unfreezing,
+    )
+    run_dir = ensure_run_dir(run_config)
+    best_model_path = run_dir / "best.pt"
+    final_model_path = run_dir / "final.pt"
 
-    os.makedirs(model_path.parent, exist_ok=True)
+    latest = find_latest_checkpoint(run_dir)
+    max_epoch_num = latest[0] if latest else 0
+    latest_epoch_checkpoint_path = latest[1] if latest else (run_dir / "checkpoints" / "epoch_0.pt")
+
+    metrics_csv_path = run_dir / "metrics.csv"
 
     num_outputs = 2 if target_types == "binary-category" else 37
 
     # Load model and initial weights
-    if os.path.exists(latest_epoch_checkpoint_path):
+    if latest and latest_epoch_checkpoint_path.exists():
         logger.info(
             f"Model checkpoint {latest_epoch_checkpoint_path} already exists. Loading model..."
         )
@@ -61,7 +78,7 @@ def main(
     # Replace classifier
     model.classifier[1] = nn.Linear(cast(nn.Linear, model.classifier[1]).in_features, num_outputs)
 
-    if os.path.exists(latest_epoch_checkpoint_path):
+    if latest and latest_epoch_checkpoint_path.exists():
         model.load_state_dict(torch.load(latest_epoch_checkpoint_path, weights_only=True))
         logger.success(f"Model checkpoint {latest_epoch_checkpoint_path} loaded successfully.")
 
@@ -97,9 +114,20 @@ def main(
     criterion = nn.CrossEntropyLoss(weight=None)  # TODO: weights
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
 
+    # for storing metrics
+    def _append_csv_row(path: Path, header: list[str], row: dict[str, object], lock: threading.Lock):
+        with lock:
+            exists = path.exists()
+            with path.open("a", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=header)
+                if not exists:
+                    writer.writeheader()
+                writer.writerow(row)
+
+    metrics_lock = threading.Lock()
+
     # Train model
     best_acc = 0.0
-    best_model_path = MODELS_DIR / f"{model_version}/best_model.pkl"
     epochs = max_epoch_num + epochs
     for epoch in range(max_epoch_num + 1, epochs + 1):
         model.train()
@@ -142,6 +170,12 @@ def main(
         val_acc = num_correct / num_total
 
         print(f"Epoch {epoch}/{epochs} loss={avg_loss:.4f} val_acc={val_acc:.4f}")
+        _append_csv_row(
+            metrics_csv_path,
+            header=["epoch", "loss", "val_acc"],
+            row={"epoch": epoch, "loss": avg_loss, "val_acc": val_acc},
+            lock=metrics_lock,
+        )
 
         if val_acc > best_acc:
             best_acc = val_acc
@@ -149,14 +183,14 @@ def main(
             logger.success(f"New best model saved (val_acc={val_acc:.4f}) to {best_model_path}")
 
         if epoch % 10 == 0:
-            model_checkpoint_path = MODELS_DIR / f"{model_version}/epoch_{epoch}.pkl"
+            model_checkpoint_path = run_dir / "checkpoints" / f"epoch_{epoch}.pt"
             print(f"Saving model after epoch {epoch} to checkpoint {model_checkpoint_path}...")
             torch.save(model.state_dict(), model_checkpoint_path)
             logger.success(f"Model checkpoint trained and saved to {model_checkpoint_path}.")
 
     # Save trained model
-    torch.save(model.state_dict(), model_path)
-    logger.success(f"Model trained and saved to {model_path}.")
+    torch.save(model.state_dict(), final_model_path)
+    logger.success(f"Model trained and saved to {final_model_path}.")
 
 
 if __name__ == "__main__":
