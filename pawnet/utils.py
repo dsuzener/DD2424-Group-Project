@@ -20,9 +20,6 @@ def get_model(model_version: str, use_weights: bool = True):
         case "efficientnet_b4":
             weights = models.EfficientNet_B4_Weights.IMAGENET1K_V1 if use_weights else None
             model = models.efficientnet_b4(weights=weights)
-        case "resnet18":
-            weights = models.ResNet18_Weights.IMAGENET1K_V1 if use_weights else None
-            model = models.resnet18(weights=weights)
         case _:
             logger.error(f"Model version {model_version} not recognized.")
             exit(1)

@@ -84,23 +84,6 @@ def main(
                 for param in block.parameters():
                     param.requires_grad = True
 
-        # ResNet fallback
-        elif hasattr(model, "layer4"):
-            layers = [
-                model.layer1,
-                model.layer2,
-                model.layer3,
-                model.layer4,
-            ]
-
-            logger.info(
-                f"Unfreezing last {num_layers} ResNet layers"
-            )
-
-            for layer in layers[-num_layers:]:
-                for param in layer.parameters():
-                    param.requires_grad = True
-
     trainable = [
         name for name, p in model.named_parameters()
         if p.requires_grad
