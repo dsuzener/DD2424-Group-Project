@@ -1,3 +1,4 @@
+from pathlib import Path
 import typer
 from pawnet.dataset import main as dataset
 from pawnet.modeling.train import main as train
@@ -15,7 +16,6 @@ def main(
     stratify: bool = True,
     target_types="binary-category",
     num_layers: int = 0,
-
 ):
     print("Hello from dd2424-group-project!")
 
@@ -33,9 +33,14 @@ def main(
             model_version=model_version,
             epochs=epochs,
             target_types=target_types,
-            num_layers=num_layers
+            num_layers=num_layers,
         )
-    predict(val_loader=test_loader, model_version=model_version, target_types=target_types)
+    predict(
+        val_loader=test_loader,
+        model_version=model_version,
+        target_types=target_types,
+        # force_model_path=Path("models/baseline/efficientnet_b2/model_9891.pkl"),
+    )
 
 
 if __name__ == "__main__":
