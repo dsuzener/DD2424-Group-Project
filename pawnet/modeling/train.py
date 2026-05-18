@@ -84,10 +84,7 @@ def main(
                 for param in block.parameters():
                     param.requires_grad = True
 
-    trainable = [
-        name for name, p in model.named_parameters()
-        if p.requires_grad
-    ]
+    trainable = [name for name, p in model.named_parameters() if p.requires_grad]
 
     logger.info("Trainable parameters:")
     for name in trainable:
@@ -98,9 +95,7 @@ def main(
 
     # Define loss function and optimizer
     criterion = nn.CrossEntropyLoss(weight=None)  # TODO: weights
-    optimizer = optim.Adam(
-        filter(lambda p: p.requires_grad, model.parameters()), lr=3e-5
-)
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=3e-5)
 
     # Train model
     best_acc = 0.0
