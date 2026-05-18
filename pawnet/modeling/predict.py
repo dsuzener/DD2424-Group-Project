@@ -93,7 +93,10 @@ def main(
     accuracy = (
         sum(num_correct.values()) / sum(num_total.values()) if sum(num_total.values()) > 0 else 0.0
     )
-    per_class_acc = {clas: num_correct[clas] / num_total[clas] if num_total[clas] > 0 else 0.0 for clas in range(num_classes)}
+    per_class_acc = {
+        clas: num_correct[clas] / num_total[clas] if num_total[clas] > 0 else 0.0
+        for clas in range(num_classes)
+    }
 
     # compute f1 score with a suitable averaging strategy
     average_mode = "binary" if num_outputs == 2 else "macro"
