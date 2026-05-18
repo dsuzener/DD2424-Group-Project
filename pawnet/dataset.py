@@ -33,9 +33,7 @@ class CustomDataset(datasets.OxfordIIITPet):
     ):
         features_path, labels_path = get_dataset_paths(PROCESSED_DATA_DIR, model_version, split)
 
-        paths_path = (
-            PROCESSED_DATA_DIR / f"{model_version}_{split}_paths.pt"
-        )
+        paths_path = PROCESSED_DATA_DIR / f"{model_version}_{split}_paths.pt"
 
         if features_path.exists() and labels_path.exists() and paths_path.exists():
             return
@@ -64,10 +62,7 @@ class CustomDataset(datasets.OxfordIIITPet):
 class ProcessedDataset(torch.utils.data.Dataset):
     def __init__(self, model_version: str, split: str):
         features_path, labels_path = get_dataset_paths(PROCESSED_DATA_DIR, model_version, split)
-        paths_path = (
-            PROCESSED_DATA_DIR
-            / f"{model_version}_{split}_paths.pt"
-        )
+        paths_path = PROCESSED_DATA_DIR / f"{model_version}_{split}_paths.pt"
 
         self.features = torch.load(features_path)
         self.labels = torch.load(labels_path).long()
