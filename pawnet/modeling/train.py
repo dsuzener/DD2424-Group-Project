@@ -95,7 +95,7 @@ def main(
 
     # Define loss function and optimizer
     criterion = nn.CrossEntropyLoss(weight=None)  # TODO: weights
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=3e-5)
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
 
     # Train model
     best_acc = 0.0
