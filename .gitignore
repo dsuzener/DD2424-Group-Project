@@ -4,7 +4,7 @@ models/*
 !models/efficientnet_b0/epoch_50.pkl
 !models/efficientnet_b1/epoch_10.pkl
 !models/efficientnet_b2/epoch_90.pkl
-!models/efficientnet_b2/epoch_9886.pkl
+!models/efficientnet_b2/model_9886.pkl
 !models/efficientnet_b2/model_9891.pkl
 !models/efficientnet_b2_best/epoch_80.pkl
 !models/efficientnet_b2_better_best/epoch_70.pkl
