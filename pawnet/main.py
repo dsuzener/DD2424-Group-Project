@@ -27,6 +27,9 @@ def main(
         model_version=model_version,
         batch_size=batch_size,
         stratify=stratify,
+        train_size=train_size,
+        num_layers=num_layers,
+        gradual_unfreezing=gradual_unfreezing,
     )
     train_loader, validation_loader = dataset(
         target_types=target_types,
@@ -34,6 +37,8 @@ def main(
         model_version=model_version,
         stratify=stratify,
         batch_size=batch_size,
+        num_layers=num_layers,
+        gradual_unfreezing=gradual_unfreezing,
     )
 
     if train_model:
@@ -44,11 +49,20 @@ def main(
             epochs=epochs,
             target_types=target_types,
             num_layers=num_layers,
+            train_size=train_size,
+            batch_size=batch_size,
+            stratify=stratify,
+            gradual_unfreezing=gradual_unfreezing,
         )
     predict(
         val_loader=test_loader,
         model_version=model_version,
         target_types=target_types,
+        train_size=train_size,
+        batch_size=batch_size,
+        stratify=stratify,
+        num_layers=num_layers,
+        gradual_unfreezing=gradual_unfreezing,
         # force_model_path=Path("models/baseline/efficientnet_b2/model_9891.pkl"),
     )
 
