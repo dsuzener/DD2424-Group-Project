@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import cast
 
@@ -9,9 +8,10 @@ import typer
 
 from pawnet.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
 from torchvision import datasets, transforms
-from torch.utils.data import random_split, DataLoader, Subset
+from torch.utils.data import random_split, DataLoader
 from sklearn.model_selection import train_test_split
-from pawnet.utils import get_dataset_paths, get_model
+from pawnet.utils import get_model
+from pawnet.modeling.run_paths import RunConfig, ensure_processed_dir
 
 
 app = typer.Typer()
@@ -27,13 +27,13 @@ class CustomDataset(datasets.OxfordIIITPet):
 
     def save_preprocessed_dataset(
         self,
-        model_version: str,
+        processed_dir: Path,
         split: str,
         indices: list[int] | None = None,
     ):
-        features_path, labels_path = get_dataset_paths(PROCESSED_DATA_DIR, model_version, split)
-
-        paths_path = PROCESSED_DATA_DIR / f"{model_version}_{split}_paths.pt"
+        features_path = processed_dir / f"{split}_features.pt"
+        labels_path = processed_dir / f"{split}_labels.pt"
+        paths_path = processed_dir / f"{split}_paths.pt"
 
         if features_path.exists() and labels_path.exists() and paths_path.exists():
             return
@@ -60,9 +60,10 @@ class CustomDataset(datasets.OxfordIIITPet):
 
 
 class ProcessedDataset(torch.utils.data.Dataset):
-    def __init__(self, model_version: str, split: str):
-        features_path, labels_path = get_dataset_paths(PROCESSED_DATA_DIR, model_version, split)
-        paths_path = PROCESSED_DATA_DIR / f"{model_version}_{split}_paths.pt"
+    def __init__(self, processed_dir: Path, split: str):
+        features_path = processed_dir / f"{split}_features.pt"
+        labels_path = processed_dir / f"{split}_labels.pt"
+        paths_path = processed_dir / f"{split}_paths.pt"
 
         self.features = torch.load(features_path)
         self.labels = torch.load(labels_path).long()
@@ -84,9 +85,19 @@ def main(
     batch_size: int = 128,
     model_version: str = "efficientnet_b0",
     stratify: bool = False,
+    num_layers: int = 0,
+    gradual_unfreezing: bool = False,
 ):
-    processed_data = PROCESSED_DATA_DIR / f"{model_version}"
-    os.makedirs(processed_data.parent, exist_ok=True)
+    run_config = RunConfig(
+        model_version=model_version,
+        target_types=target_types,
+        train_size=train_size,
+        batch_size=batch_size,
+        stratify=stratify,
+        num_layers=num_layers,
+        gradual_unfreezing=gradual_unfreezing,
+    )
+    processed_dir = ensure_processed_dir(run_config)
 
     _, weights = get_model(model_version=model_version, use_weights=True)
 
@@ -110,7 +121,7 @@ def main(
         if stratify:
             indices = list(
                 range(len(dataset))
-            )  # TODO: test stratify (labels may not work for binary)
+            )
             train_indices, val_indices = train_test_split(
                 indices,
                 train_size=train_size,
@@ -118,13 +129,13 @@ def main(
                 random_state=42,
             )
             dataset.save_preprocessed_dataset(
-                model_version,
+                processed_dir,
                 "train",
                 train_indices,
             )
 
             dataset.save_preprocessed_dataset(
-                model_version,
+                processed_dir,
                 "val",
                 val_indices,
             )
@@ -135,25 +146,25 @@ def main(
                 generator=torch.Generator().manual_seed(42),
             )
             dataset.save_preprocessed_dataset(
-                model_version,
+                processed_dir,
                 "train",
                 cast(list[int], train_set.indices),
             )
             dataset.save_preprocessed_dataset(
-                model_version,
+                processed_dir,
                 "val",
                 cast(list[int], val_set.indices),
             )
 
         train_loader = DataLoader(
-            ProcessedDataset(model_version, "train"),
+            ProcessedDataset(processed_dir, "train"),
             batch_size=batch_size,
             shuffle=True,
             # num_workers=4,
             # persistent_workers=True,
         )
         val_loader = DataLoader(
-            ProcessedDataset(model_version, "val"),
+            ProcessedDataset(processed_dir, "val"),
             batch_size=batch_size,
             shuffle=False,
             # num_workers=4,
@@ -164,12 +175,12 @@ def main(
         return train_loader, val_loader
     else:
         dataset.save_preprocessed_dataset(
-            model_version,
+            processed_dir,
             "test",
         )
 
         test_loader = DataLoader(
-            ProcessedDataset(model_version, "test"),
+            ProcessedDataset(processed_dir, "test"),
             batch_size=batch_size,
             shuffle=False,
             # num_workers=4,
