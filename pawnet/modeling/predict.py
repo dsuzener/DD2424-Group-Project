@@ -26,10 +26,18 @@ def main(
     features_path: Path = PROCESSED_DATA_DIR / "test_features.csv",
     predictions_path: Path = PROCESSED_DATA_DIR / "test_predictions.csv",
     target_types: str = "binary-category",
+    force_model_path: Path | None = None,
 ):
     best_model_path = MODELS_DIR / f"{model_version}/model.pkl"
-    model_path = best_model_path if best_model_path.exists() else (MODELS_DIR / f"{model_version}/model.pkl")
+    model_path = (
+        best_model_path
+        if best_model_path.exists()
+        else (MODELS_DIR / f"{model_version}/model.pkl")
+    )
     num_outputs = 2 if target_types == "binary-category" else 37
+    if force_model_path and force_model_path.exists():
+        logger.info(f"Using forced model path: {force_model_path}")
+        model_path = force_model_path
 
     model, _ = get_model(model_version=model_version, use_weights=False)
     model.classifier[1] = nn.Linear(cast(nn.Linear, model.classifier[1]).in_features, num_outputs)
@@ -62,9 +70,7 @@ def main(
                         "path": paths[i],
                         "true": labels[i].item(),
                         "pred": preds[i].item(),
-                        "confidence": torch.softmax(
-                            outputs[i], dim=0
-                        )[preds[i]].item(),
+                        "confidence": torch.softmax(outputs[i], dim=0)[preds[i]].item(),
                     }
                 )
 
@@ -98,7 +104,7 @@ def main(
     for clas in range(num_classes):
         print(f"Class {clas} accuracy: {per_class_acc[clas]}")
 
-    if False: # debug
+    if False:  # debug
         print("\nIncorrect predictions:")
         print("=" * 80)
 
