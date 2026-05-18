@@ -1,61 +1,42 @@
-# pawnet
+# Instructions
 
-<a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
-    <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
-</a>
-
-A short description of the project.
-
-## Project Organization
-
-```
-├── LICENSE            <- Open-source license if one is chosen
-├── Makefile           <- Makefile with convenience commands like `make data` or `make train`
-├── README.md          <- The top-level README for developers using this project.
-├── data
-│   ├── external       <- Data from third party sources.
-│   ├── interim        <- Intermediate data that has been transformed.
-│   ├── processed      <- The final, canonical data sets for modeling.
-│   └── raw            <- The original, immutable data dump.
-│
-├── docs               <- A default mkdocs project; see www.mkdocs.org for details
-│
-├── models             <- Trained and serialized models, model predictions, or model summaries
-│
-├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-│                         the creator's initials, and a short `-` delimited description, e.g.
-│                         `1.0-jqp-initial-data-exploration`.
-│
-├── pyproject.toml     <- Project configuration file with package metadata for 
-│                         pawnet and configuration for tools like black
-│
-├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-│
-├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-│   └── figures        <- Generated graphics and figures to be used in reporting
-│
-├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-│                         generated with `pip freeze > requirements.txt`
-│
-├── setup.cfg          <- Configuration file for flake8
-│
-└── pawnet   <- Source code for use in this project.
-    │
-    ├── __init__.py             <- Makes pawnet a Python module
-    │
-    ├── config.py               <- Store useful variables and configuration
-    │
-    ├── dataset.py              <- Scripts to download or generate data
-    │
-    ├── features.py             <- Code to create features for modeling
-    │
-    ├── modeling                
-    │   ├── __init__.py 
-    │   ├── predict.py          <- Code to run model inference with trained models          
-    │   └── train.py            <- Code to train models
-    │
-    └── plots.py                <- Code to create visualizations
+Prediction only:
+```sh
+uv run pawnet/main.py --no-train-model
 ```
 
---------
+Train a specific version BX of efficientnet (0-7, default 0)
+```sh
+uv run pawnet/main.py --train_model efficientnet_bX
+```
 
+Train for 37 categories:
+```sh
+uv run pawnet/main.py --target-types category
+```
+
+Train for X epochs:
+```sh
+uv run pawnet/main.py --epochs X
+```
+
+Train X number of layers:
+```sh
+uv run pawnet/main.py --num-layers X
+```
+
+Train with X% of train-val data float in range (0.0,1.0) exclusive:
+```sh
+uv run pawnet/main.py --train-size 0.X
+```
+
+Train with X batch size (power of 2):
+```sh
+uv run pawnet/main.py --batch_size X
+```
+
+Train with gradual unfreezing of X number of layers:
+Train X number of layers:
+```sh
+uv run pawnet/main.py --num-layers X --gradual-unfreezing
+```
