@@ -16,14 +16,24 @@ def main(
     stratify: bool = True,
     target_types="binary-category",
     num_layers: int = 0,
+    batch_size: int = 128,
+    gradual_unfreezing: bool = False,
 ):
     print("Hello from dd2424-group-project!")
 
     test_loader = dataset(
-        split="test", target_types="binary-category", model_version=model_version
+        split="test",
+        target_types=target_types,
+        model_version=model_version,
+        batch_size=batch_size,
+        stratify=stratify,
     )
     train_loader, validation_loader = dataset(
-        train_size=train_size, model_version=model_version, stratify=stratify
+        target_types=target_types,
+        train_size=train_size,
+        model_version=model_version,
+        stratify=stratify,
+        batch_size=batch_size,
     )
 
     if train_model:
