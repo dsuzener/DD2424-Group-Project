@@ -13,7 +13,9 @@ def main(
     epochs: int = 1,
     train_size: float = 0.80,
     stratify: bool = True,
-    num_layers: int = 1,
+    target_types="binary-category",
+    num_layers: int = 0,
+
 ):
     print("Hello from dd2424-group-project!")
 
@@ -30,9 +32,10 @@ def main(
             validation_loader=validation_loader,
             model_version=model_version,
             epochs=epochs,
-            num_layers=2,
+            target_types=target_types,
+            num_layers=num_layers
         )
-    predict(val_loader=test_loader, model_version=model_version)
+    predict(val_loader=test_loader, model_version=model_version, target_types=target_types)
 
 
 if __name__ == "__main__":
