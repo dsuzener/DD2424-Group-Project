@@ -1,3 +1,4 @@
+from pathlib import Path
 import typer
 from pawnet.dataset import main as dataset
 from pawnet.modeling.train import main as train
@@ -13,15 +14,31 @@ def main(
     epochs: int = 1,
     train_size: float = 0.80,
     stratify: bool = True,
-    num_layers: int = 1,
+    target_types="binary-category",
+    num_layers: int = 0,
+    batch_size: int = 128,
+    gradual_unfreezing: bool = False,
 ):
     print("Hello from dd2424-group-project!")
 
     test_loader = dataset(
-        split="test", target_types="binary-category", model_version=model_version
+        split="test",
+        target_types=target_types,
+        model_version=model_version,
+        batch_size=batch_size,
+        stratify=stratify,
+        train_size=train_size,
+        num_layers=num_layers,
+        gradual_unfreezing=gradual_unfreezing,
     )
     train_loader, validation_loader = dataset(
-        train_size=train_size, model_version=model_version, stratify=stratify
+        target_types=target_types,
+        train_size=train_size,
+        model_version=model_version,
+        stratify=stratify,
+        batch_size=batch_size,
+        num_layers=num_layers,
+        gradual_unfreezing=gradual_unfreezing,
     )
 
     if train_model:
@@ -30,9 +47,24 @@ def main(
             validation_loader=validation_loader,
             model_version=model_version,
             epochs=epochs,
-            num_layers=2,
+            target_types=target_types,
+            num_layers=num_layers,
+            train_size=train_size,
+            batch_size=batch_size,
+            stratify=stratify,
+            gradual_unfreezing=gradual_unfreezing,
         )
-    predict(val_loader=test_loader, model_version=model_version)
+    predict(
+        val_loader=test_loader,
+        model_version=model_version,
+        target_types=target_types,
+        train_size=train_size,
+        batch_size=batch_size,
+        stratify=stratify,
+        num_layers=num_layers,
+        gradual_unfreezing=gradual_unfreezing,
+        # force_model_path=Path("models/baseline/efficientnet_b2/model_9891.pkl"),
+    )
 
 
 if __name__ == "__main__":

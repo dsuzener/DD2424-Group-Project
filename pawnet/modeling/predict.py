@@ -15,6 +15,7 @@ from torchvision import models
 from PIL import Image
 
 from pawnet.utils import get_model
+from pawnet.modeling.run_paths import RunConfig, get_run_dir, resolve_model_path_for_predict
 
 app = typer.Typer()
 
@@ -26,11 +27,31 @@ def main(
     features_path: Path = PROCESSED_DATA_DIR / "test_features.csv",
     predictions_path: Path = PROCESSED_DATA_DIR / "test_predictions.csv",
     target_types: str = "binary-category",
+    train_size: float = 0.80,
+    batch_size: int = 128,
+    stratify: bool = True,
+    num_layers: int = 0,
+    gradual_unfreezing: bool = False,
+    prefer_weights: str = "best",
+    force_model_path: Path | None = None,
 ):
-    best_model_path = MODELS_DIR / f"{model_version}/model.pkl"
-    model_path = best_model_path if best_model_path.exists() else (MODELS_DIR / f"{model_version}/model.pkl")
+    run_config = RunConfig(
+        model_version=model_version,
+        target_types=target_types,
+        train_size=train_size,
+        batch_size=batch_size,
+        stratify=stratify,
+        num_layers=num_layers,
+        gradual_unfreezing=gradual_unfreezing,
+    )
+    run_dir = get_run_dir(run_config)
+    model_path = resolve_model_path_for_predict(run_dir, prefer=prefer_weights)
     num_outputs = 2 if target_types == "binary-category" else 37
+    if force_model_path and force_model_path.exists():
+        logger.info(f"Using forced model path: {force_model_path}")
+        model_path = force_model_path
 
+    logger.info(f"Loading model weights from {model_path}")
     model, _ = get_model(model_version=model_version, use_weights=False)
     model.classifier[1] = nn.Linear(cast(nn.Linear, model.classifier[1]).in_features, num_outputs)
     model.load_state_dict(torch.load(model_path, weights_only=True))
@@ -62,9 +83,7 @@ def main(
                         "path": paths[i],
                         "true": labels[i].item(),
                         "pred": preds[i].item(),
-                        "confidence": torch.softmax(
-                            outputs[i], dim=0
-                        )[preds[i]].item(),
+                        "confidence": torch.softmax(outputs[i], dim=0)[preds[i]].item(),
                     }
                 )
 
@@ -87,6 +106,10 @@ def main(
     accuracy = (
         sum(num_correct.values()) / sum(num_total.values()) if sum(num_total.values()) > 0 else 0.0
     )
+    per_class_acc = {
+        clas: num_correct[clas] / num_total[clas] if num_total[clas] > 0 else 0.0
+        for clas in range(num_classes)
+    }
 
     # compute f1 score with a suitable averaging strategy
     average_mode = "binary" if num_outputs == 2 else "macro"
@@ -94,8 +117,10 @@ def main(
 
     print(f"Accuracy: {accuracy:.4f}")
     print(f"F1 ({average_mode}): {f1:.4f}")
+    for clas in range(num_classes):
+        print(f"Class {clas} accuracy: {per_class_acc[clas]}")
 
-    if False: # debug
+    if False:  # debug
         print("\nIncorrect predictions:")
         print("=" * 80)
 
