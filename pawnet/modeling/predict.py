@@ -32,6 +32,11 @@ def main(
     stratify: bool = True,
     num_layers: int = 0,
     gradual_unfreezing: bool = False,
+    labeled_fraction: float = 1.0,
+    use_pseudolabels: bool = False,
+    pseudolabel_threshold: float = 0.9,
+    pseudolabel_weight: float = 1.0,
+    pseudolabel_start_epoch: int = 1,
     prefer_weights: str = "best",
     force_model_path: Path | None = None,
 ):
@@ -39,10 +44,15 @@ def main(
         model_version=model_version,
         target_types=target_types,
         train_size=train_size,
+        labeled_fraction=labeled_fraction,
         batch_size=batch_size,
         stratify=stratify,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        use_pseudolabels=use_pseudolabels,
+        pseudolabel_threshold=pseudolabel_threshold,
+        pseudolabel_weight=pseudolabel_weight,
+        pseudolabel_start_epoch=pseudolabel_start_epoch,
     )
     run_dir = get_run_dir(run_config)
     model_path = resolve_model_path_for_predict(run_dir, prefer=prefer_weights)
