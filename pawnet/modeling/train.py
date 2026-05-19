@@ -25,6 +25,7 @@ app = typer.Typer()
 def main(
     train_loader,
     validation_loader,
+    unlabeled_loader=None,
     model_version: str = "efficientnet_b0",
     features_path: Path = PROCESSED_DATA_DIR / "features.csv",
     labels_path: Path = PROCESSED_DATA_DIR / "labels.csv",
@@ -35,6 +36,11 @@ def main(
     batch_size: int = 128,
     stratify: bool = True,
     gradual_unfreezing: bool = False,
+    labeled_fraction: float = 1.0,
+    use_pseudolabels: bool = False,
+    pseudolabel_threshold: float = 0.9,
+    pseudolabel_weight: float = 1.0,
+    pseudolabel_start_epoch: int = 1,
 ):
     # config stuff
     # if changing the config, change the parameters of this function too!
@@ -42,10 +48,15 @@ def main(
         model_version=model_version,
         target_types=target_types,
         train_size=train_size,
+        labeled_fraction=labeled_fraction,
         batch_size=batch_size,
         stratify=stratify,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        use_pseudolabels=use_pseudolabels,
+        pseudolabel_threshold=pseudolabel_threshold,
+        pseudolabel_weight=pseudolabel_weight,
+        pseudolabel_start_epoch=pseudolabel_start_epoch,
     )
     run_dir = ensure_run_dir(run_config)
     best_model_path = run_dir / "best.pt"
@@ -133,12 +144,48 @@ def main(
         model.train()
         total_loss = 0
 
+        # pseudolabeling stats
+        total_unsup_loss = 0.0
+        total_unsup_kept = 0
+        total_unsup_seen = 0
+
+        use_unsup = (
+            use_pseudolabels
+            and unlabeled_loader is not None
+            and epoch >= pseudolabel_start_epoch
+            and pseudolabel_weight > 0.0
+        )
+
+        unlabeled_iter = iter(unlabeled_loader) if use_unsup else None
+
         for images, labels, _ in tqdm(train_loader, desc=f"Epoch {epoch}/{epochs}"):
             images, labels = images.to(device), labels.to(device)
 
             # Forward
             outputs = model(images)
             loss = criterion(outputs, labels)
+
+            unsup_loss = None
+            if use_unsup and unlabeled_iter is not None:
+                # get unlabeled batch and loop around if end
+                try:
+                    u_images, _u_paths = next(unlabeled_iter)
+                except StopIteration:
+                    unlabeled_iter = iter(unlabeled_loader)
+                    u_images, _u_paths = next(unlabeled_iter)
+
+                u_images = u_images.to(device)
+                u_logits = model(u_images)
+                u_probs = torch.softmax(u_logits, dim=1)
+                u_conf, u_pseudo = torch.max(u_probs, dim=1)
+                keep = u_conf >= pseudolabel_threshold
+                total_unsup_seen += int(u_images.size(0))
+
+                # Only keep if above threshold
+                if keep.any():
+                    total_unsup_kept += int(keep.sum().item())
+                    unsup_loss = criterion(u_logits[keep], u_pseudo[keep])
+                    loss = loss + (pseudolabel_weight * unsup_loss)
 
             # Backward
             optimizer.zero_grad()
@@ -148,8 +195,11 @@ def main(
             optimizer.step()
 
             total_loss += loss.item()
+            if unsup_loss is not None:
+                total_unsup_loss += float(unsup_loss.item())
 
         avg_loss = total_loss / len(train_loader)
+        avg_unsup_loss = (total_unsup_loss / max(1, len(train_loader))) if use_unsup else 0.0
 
         # Evaluate on validation set
         model.eval()
@@ -169,11 +219,25 @@ def main(
 
         val_acc = num_correct / num_total
 
-        print(f"Epoch {epoch}/{epochs} loss={avg_loss:.4f} val_acc={val_acc:.4f}")
+        # PSeudolabing stats logging
+        extras = ""
+        if use_unsup:
+            extras = (
+                f" unsup_loss={avg_unsup_loss:.4f}"
+                f" kept={total_unsup_kept}/{total_unsup_seen}"
+            )
+        print(f"Epoch {epoch}/{epochs} loss={avg_loss:.4f} val_acc={val_acc:.4f}{extras}")
         _append_csv_row(
             metrics_csv_path,
-            header=["epoch", "loss", "val_acc"],
-            row={"epoch": epoch, "loss": avg_loss, "val_acc": val_acc},
+            header=["epoch", "loss", "val_acc", "unsup_loss", "unsup_kept", "unsup_seen"],
+            row={
+                "epoch": epoch,
+                "loss": avg_loss,
+                "val_acc": val_acc,
+                "unsup_loss": avg_unsup_loss if use_unsup else "",
+                "unsup_kept": total_unsup_kept if use_unsup else "",
+                "unsup_seen": total_unsup_seen if use_unsup else "",
+            },
             lock=metrics_lock,
         )
 
