@@ -9,10 +9,10 @@ app = typer.Typer()
 
 @app.command()
 def main(
-    model_version: str = "efficientnet_b0",
+    model_version: str = "efficientnet_b2",
     train_model: bool = True,
-    epochs: int = 1,
-    train_size: float = 0.80,
+    epochs: int = 30,
+    train_size: float = 0.90,
     stratify: bool = True,
     target_types="binary-category",
     num_layers: int = 0,
