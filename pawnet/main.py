@@ -18,6 +18,11 @@ def main(
     num_layers: int = 0,
     batch_size: int = 128,
     gradual_unfreezing: bool = False,
+    labeled_fraction: float = 1.0,
+    use_pseudolabels: bool = False,
+    pseudolabel_threshold: float = 0.9,
+    pseudolabel_weight: float = 1.0,
+    pseudolabel_start_epoch: int = 1,
 ):
     print("Hello from dd2424-group-project!")
 
@@ -31,7 +36,7 @@ def main(
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
     )
-    train_loader, validation_loader = dataset(
+    trainval_result = dataset(
         target_types=target_types,
         train_size=train_size,
         model_version=model_version,
@@ -39,12 +44,19 @@ def main(
         batch_size=batch_size,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        labeled_fraction=labeled_fraction,
     )
+    unlabeled_loader = None
+    if isinstance(trainval_result, tuple) and len(trainval_result) == 3: # this is a bit scuffed but it works
+        train_loader, validation_loader, unlabeled_loader = trainval_result
+    else:
+        train_loader, validation_loader = trainval_result
 
     if train_model:
         train(
             train_loader=train_loader,
             validation_loader=validation_loader,
+            unlabeled_loader=unlabeled_loader,
             model_version=model_version,
             epochs=epochs,
             target_types=target_types,
@@ -53,6 +65,11 @@ def main(
             batch_size=batch_size,
             stratify=stratify,
             gradual_unfreezing=gradual_unfreezing,
+            labeled_fraction=labeled_fraction,
+            use_pseudolabels=use_pseudolabels,
+            pseudolabel_threshold=pseudolabel_threshold,
+            pseudolabel_weight=pseudolabel_weight,
+            pseudolabel_start_epoch=pseudolabel_start_epoch,
         )
     predict(
         val_loader=test_loader,
@@ -63,7 +80,11 @@ def main(
         stratify=stratify,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
-        # force_model_path=Path("models/baseline/efficientnet_b2/model_9891.pkl"),
+        labeled_fraction=labeled_fraction,
+        use_pseudolabels=use_pseudolabels,
+        pseudolabel_threshold=pseudolabel_threshold,
+        pseudolabel_weight=pseudolabel_weight,
+        pseudolabel_start_epoch=pseudolabel_start_epoch,
     )
 
 
