@@ -14,10 +14,12 @@ def main(
     epochs: int = 30,
     train_size: float = 0.90,
     stratify: bool = True,
-    target_types="binary-category",
+    target_types="category",
     num_layers: int = 0,
-    batch_size: int = 128,
+    batch_size: int = 64,
     gradual_unfreezing: bool = False,
+    augment: bool = False,
+    L2: bool = False
 ):
     print("Hello from dd2424-group-project!")
 
@@ -39,6 +41,7 @@ def main(
         batch_size=batch_size,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        augment = augment,
     )
 
     if train_model:
@@ -53,6 +56,7 @@ def main(
             batch_size=batch_size,
             stratify=stratify,
             gradual_unfreezing=gradual_unfreezing,
+            L2 = L2,
         )
     predict(
         val_loader=test_loader,

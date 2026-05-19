@@ -10,8 +10,10 @@ from pawnet.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
 from torchvision import datasets, transforms
 from torch.utils.data import random_split, DataLoader
 from sklearn.model_selection import train_test_split
+
 from pawnet.utils import get_model
 from pawnet.modeling.run_paths import RunConfig, ensure_processed_dir
+from torchvision.transforms import v2
 
 
 app = typer.Typer()
@@ -60,20 +62,23 @@ class CustomDataset(datasets.OxfordIIITPet):
 
 
 class ProcessedDataset(torch.utils.data.Dataset):
-    def __init__(self, processed_dir: Path, split: str):
+    def __init__(self, processed_dir: Path, split: str, transform = None):
         features_path = processed_dir / f"{split}_features.pt"
         labels_path = processed_dir / f"{split}_labels.pt"
         paths_path = processed_dir / f"{split}_paths.pt"
-
         self.features = torch.load(features_path)
         self.labels = torch.load(labels_path).long()
         self.paths = torch.load(paths_path, weights_only=False)
+        self.transform = transform
 
     def __len__(self):
         return len(self.labels)
-
+    
     def __getitem__(self, idx):
-        return self.features[idx], self.labels[idx], self.paths[idx]
+
+        features = self.transform(self.features[idx]) if self.transform else self.features[idx]
+        
+        return features, self.labels[idx], self.paths[idx]
 
 
 @app.command()
@@ -87,6 +92,7 @@ def main(
     stratify: bool = False,
     num_layers: int = 0,
     gradual_unfreezing: bool = False,
+    augment: bool = False
 ):
     run_config = RunConfig(
         model_version=model_version,
@@ -155,20 +161,30 @@ def main(
                 "val",
                 cast(list[int], val_set.indices),
             )
+        
+        transform = v2.Compose([
+            v2.Resize((260, 260)),      # Used for efficientnet-b2
+            v2.RandomHorizontalFlip(p=0.5),
+            v2.RandomRotation((-20, 20)),
+            v2.RandomResizedCrop(size=(224, 224), scale=(0.9, 1.1)),
+            v2.Normalize(mean=[0.485, 0.456, 0.406],
+                        std=[0.229, 0.224, 0.225]),
+        ]) if augment else None
 
         train_loader = DataLoader(
-            ProcessedDataset(processed_dir, "train"),
+            ProcessedDataset(model_version, "train", transform=transform),
             batch_size=batch_size,
             shuffle=True,
-            # num_workers=4,
-            # persistent_workers=True,
+            num_workers=4,
+            persistent_workers=True,
         )
+
         val_loader = DataLoader(
             ProcessedDataset(processed_dir, "val"),
             batch_size=batch_size,
             shuffle=False,
-            # num_workers=4,
-            # persistent_workers=True,
+            num_workers=4,
+            persistent_workers=True,
         )
         logger.success("Train and validation datasets ready.")
 
@@ -183,8 +199,8 @@ def main(
             ProcessedDataset(processed_dir, "test"),
             batch_size=batch_size,
             shuffle=False,
-            # num_workers=4,
-            # persistent_workers=True,
+            num_workers=4,
+            persistent_workers=True,
         )
         logger.success("Test dataset ready.")
 
