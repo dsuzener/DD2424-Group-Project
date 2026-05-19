@@ -36,7 +36,31 @@ uv run pawnet/main.py --batch_size X
 ```
 
 Train with gradual unfreezing of X number of layers:
-Train X number of layers:
 ```sh
 uv run pawnet/main.py --num-layers X --gradual-unfreezing
+```
+
+Train with X% labelled training data float in range (0.0,1.0] (rest becomes unlabelled):
+```sh
+uv run pawnet/main.py --labeled-fraction 0.X
+```
+
+Train with pseudo-labeling, keeping X% of labels:
+```sh
+uv run pawnet/main.py --labeled-fraction 0.X --use-pseudolabels
+```
+
+Train with pseudo-label confidence threshold in [0,1]:
+```sh
+uv run pawnet/main.py --use-pseudolabels --pseudolabel-threshold 0.95
+```
+
+Train with pseudo-label loss weight:
+```sh
+uv run pawnet/main.py --use-pseudolabels --pseudolabel-weight 0.5
+```
+
+Train with pseudo-labeling after N epochs (1-based):
+```sh
+uv run pawnet/main.py --use-pseudolabels --pseudolabel-start-epoch 2
 ```
