@@ -8,7 +8,7 @@ import typer
 
 from pawnet.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
 from torchvision import datasets, transforms
-from torch.utils.data import random_split, DataLoader
+from torch.utils.data import random_split, DataLoader, Subset
 from sklearn.model_selection import train_test_split
 from pawnet.utils import get_model
 from pawnet.modeling.run_paths import RunConfig, ensure_processed_dir
@@ -76,6 +76,18 @@ class ProcessedDataset(torch.utils.data.Dataset):
         return self.features[idx], self.labels[idx], self.paths[idx]
 
 
+class UnlabeledView(torch.utils.data.Dataset):
+    def __init__(self, base: torch.utils.data.Dataset):
+        self.base = base
+
+    def __len__(self):
+        return len(self.base)
+
+    def __getitem__(self, idx):
+        x, _y, path = self.base[idx]
+        return x, path
+
+
 @app.command()
 def main(
     data_path: Path = RAW_DATA_DIR,
@@ -87,11 +99,13 @@ def main(
     stratify: bool = False,
     num_layers: int = 0,
     gradual_unfreezing: bool = False,
+    labeled_fraction: float = 1.0,
 ):
     run_config = RunConfig(
         model_version=model_version,
         target_types=target_types,
         train_size=train_size,
+        labeled_fraction=labeled_fraction,
         batch_size=batch_size,
         stratify=stratify,
         num_layers=num_layers,
@@ -156,22 +170,47 @@ def main(
                 cast(list[int], val_set.indices),
             )
 
+        # Pseudolabeling split
+        full_train_ds = ProcessedDataset(processed_dir, "train")
+        unlabeled_loader = None
+
+        if labeled_fraction < 1.0:
+            if labeled_fraction <= 0.0:
+                raise typer.BadParameter("labeled_fraction must be in (0, 1].")
+
+            n_total = len(full_train_ds)
+            n_labeled = max(1, int(round(labeled_fraction * n_total)))
+            labeled_split, unlabeled_split = random_split(
+                range(n_total),
+                [n_labeled, n_total - n_labeled],
+                generator=torch.Generator().manual_seed(42),
+            )
+            labeled_ds = Subset(full_train_ds, cast(list[int], labeled_split.indices))
+            unlabeled_ds = UnlabeledView(Subset(full_train_ds, cast(list[int], unlabeled_split.indices)))
+
+            train_ds_for_loader = labeled_ds
+            unlabeled_loader = DataLoader(
+                unlabeled_ds,
+                batch_size=batch_size,
+                shuffle=True,
+            )
+        else:
+            train_ds_for_loader = full_train_ds
+
         train_loader = DataLoader(
-            ProcessedDataset(processed_dir, "train"),
+            train_ds_for_loader,
             batch_size=batch_size,
             shuffle=True,
-            # num_workers=4,
-            # persistent_workers=True,
         )
         val_loader = DataLoader(
             ProcessedDataset(processed_dir, "val"),
             batch_size=batch_size,
             shuffle=False,
-            # num_workers=4,
-            # persistent_workers=True,
         )
         logger.success("Train and validation datasets ready.")
 
+        if unlabeled_loader is not None:
+            return train_loader, val_loader, unlabeled_loader
         return train_loader, val_loader
     else:
         dataset.save_preprocessed_dataset(
@@ -183,8 +222,6 @@ def main(
             ProcessedDataset(processed_dir, "test"),
             batch_size=batch_size,
             shuffle=False,
-            # num_workers=4,
-            # persistent_workers=True,
         )
         logger.success("Test dataset ready.")
 
