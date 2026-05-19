@@ -26,21 +26,37 @@ class RunConfig:
     model_version: str
     target_types: str
     train_size: float
+    labeled_fraction: float
     batch_size: int
     stratify: bool
     num_layers: int
     gradual_unfreezing: bool
+    use_pseudolabels: bool = False
+    pseudolabel_threshold: float = 0.9
+    pseudolabel_weight: float = 1.0
+    pseudolabel_start_epoch: int = 1
 
     def folder_parts(self) -> list[str]:
-        return [
+        parts = [
             f"model={_slug(self.model_version)}",
             f"targets={_slug(self.target_types)}",
             f"train={_float_folder(self.train_size)}",
+            f"labeled={_float_folder(self.labeled_fraction)}",
             f"batch={self.batch_size}",
             f"stratify={int(self.stratify)}",
             f"layers={self.num_layers}",
             f"gradual={int(self.gradual_unfreezing)}",
         ]
+        parts.append(f"pseudolabels={int(self.use_pseudolabels)}")
+        if self.use_pseudolabels:
+            parts.extend(
+                [
+                    f"plthr={_float_folder(self.pseudolabel_threshold)}",
+                    f"plw={_float_folder(self.pseudolabel_weight)}",
+                    f"plstart={self.pseudolabel_start_epoch}",
+                ]
+            )
+        return parts
 
 # function to get run dir path from config (doesn't create)
 def get_run_dir(config: RunConfig) -> Path:
