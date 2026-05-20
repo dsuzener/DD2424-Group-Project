@@ -18,6 +18,9 @@ def main(
     num_layers: int = 0,
     batch_size: int = 128,
     gradual_unfreezing: bool = False,
+    imbalanced_training: bool = False,
+    weighted_loss: bool = False,
+    
 ):
     print("Hello from dd2424-group-project!")
 
@@ -30,6 +33,8 @@ def main(
         train_size=train_size,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        imbalanced_training=False,
+        weighted_loss=False,
     )
     train_loader, validation_loader = dataset(
         target_types=target_types,
@@ -39,6 +44,8 @@ def main(
         batch_size=batch_size,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        imbalanced_training=imbalanced_training,
+        weighted_loss=weighted_loss,
     )
 
     if train_model:
@@ -53,6 +60,8 @@ def main(
             batch_size=batch_size,
             stratify=stratify,
             gradual_unfreezing=gradual_unfreezing,
+            imbalanced_training=imbalanced_training,
+            weighted_loss=weighted_loss,
         )
     predict(
         val_loader=test_loader,
@@ -63,6 +72,8 @@ def main(
         stratify=stratify,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        imbalanced_training=imbalanced_training,
+        weighted_loss=weighted_loss,
         # force_model_path=Path("models/baseline/efficientnet_b2/model_9891.pkl"),
     )
 

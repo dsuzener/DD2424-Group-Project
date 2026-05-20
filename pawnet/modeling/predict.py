@@ -34,6 +34,8 @@ def main(
     gradual_unfreezing: bool = False,
     prefer_weights: str = "best",
     force_model_path: Path | None = None,
+    imbalanced_training: bool = False,
+    weighted_loss: bool = False,
 ):
     run_config = RunConfig(
         model_version=model_version,
@@ -43,6 +45,8 @@ def main(
         stratify=stratify,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        imbalanced_training=imbalanced_training,
+        weighted_loss=weighted_loss,
     )
     run_dir = get_run_dir(run_config)
     model_path = resolve_model_path_for_predict(run_dir, prefer=prefer_weights)

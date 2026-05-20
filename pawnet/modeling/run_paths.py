@@ -30,6 +30,8 @@ class RunConfig:
     stratify: bool
     num_layers: int
     gradual_unfreezing: bool
+    imbalanced_training: bool
+    weighted_loss: bool
 
     def folder_parts(self) -> list[str]:
         return [
@@ -40,6 +42,8 @@ class RunConfig:
             f"stratify={int(self.stratify)}",
             f"layers={self.num_layers}",
             f"gradual={int(self.gradual_unfreezing)}",
+            f"imbalanced={int(self.imbalanced_training)}",
+            f"weighted={int(self.weighted_loss)}",
         ]
 
 # function to get run dir path from config (doesn't create)

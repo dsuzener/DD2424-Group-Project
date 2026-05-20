@@ -16,6 +16,36 @@ from pawnet.modeling.run_paths import RunConfig, ensure_processed_dir
 
 app = typer.Typer()
 
+def get_imbalanced_classes( 
+    dataset, 
+    train_indices: list[int],
+    keep_fraction = 0.2,
+    seed: int = 42
+    ):
+    
+    generator = torch.Generator().manual_seed(seed)
+    
+    cat_indices = set(range(12))
+    
+    kept = []
+    indexes_by_class = {}
+    
+    # Populate indexes_by_label
+    for idx in train_indices:
+        label = dataset[idx][1]
+        indexes_by_class.setdefault(label, []).append(idx)
+        
+    # Keep only 20% of each cat class
+    for label, class_idxs in indexes_by_class.items():
+        if label in cat_indices:
+            n_keep = max(1, int(len(class_idxs) * keep_fraction))
+            permutation = torch.randperm(len(class_idxs), generator=generator)[:n_keep]    
+            kept.extend([class_idxs[i] for i in permutation.tolist()])
+        else:
+            kept.extend(class_idxs)
+    
+    return sorted(kept) # Sort to increase reproducability
+
 
 class CustomDataset(datasets.OxfordIIITPet):
     def __init__(
@@ -87,6 +117,8 @@ def main(
     stratify: bool = False,
     num_layers: int = 0,
     gradual_unfreezing: bool = False,
+    imbalanced_training: bool = False,
+    weighted_loss: bool = False,
 ):
     run_config = RunConfig(
         model_version=model_version,
@@ -96,6 +128,8 @@ def main(
         stratify=stratify,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        imbalanced_training=imbalanced_training,
+        weighted_loss=weighted_loss,
     )
     processed_dir = ensure_processed_dir(run_config)
 
@@ -128,6 +162,13 @@ def main(
                 stratify=[dataset[i][1] for i in indices],
                 random_state=42,
             )
+            
+            
+            if imbalanced_training:
+                train_indices = get_imbalanced_classes(dataset, train_indices)
+                logger.info(f"Using imbalanced training set with {len(train_indices)} examples.")
+            
+            
             dataset.save_preprocessed_dataset(
                 processed_dir,
                 "train",
@@ -139,6 +180,8 @@ def main(
                 "val",
                 val_indices,
             )
+            
+            
         else:
             train_set, val_set = random_split(
                 dataset,
