@@ -32,7 +32,7 @@ uv run pawnet/main.py --train-size 0.X
 
 Train with X batch size (power of 2):
 ```sh
-uv run pawnet/main.py --batch_size X
+uv run pawnet/main.py --batch-size X
 ```
 
 Train with gradual unfreezing of X number of layers:
