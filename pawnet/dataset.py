@@ -163,16 +163,15 @@ def main(
             )
         
         transform = v2.Compose([
-            v2.Resize((260, 260)),      # Used for efficientnet-b2
             v2.RandomHorizontalFlip(p=0.5),
-            v2.RandomRotation((-20, 20)),
-            v2.RandomResizedCrop(size=(224, 224), scale=(0.9, 1.1)),
+            v2.RandomRotation((-15, 15)),
+            v2.RandomResizedCrop(size=(260, 260), scale=(0.7, 1.0)),
             v2.Normalize(mean=[0.485, 0.456, 0.406],
                         std=[0.229, 0.224, 0.225]),
         ]) if augment else None
 
         train_loader = DataLoader(
-            ProcessedDataset(model_version, "train", transform=transform),
+            ProcessedDataset(processed_dir, "train", transform=transform),
             batch_size=batch_size,
             shuffle=True,
             num_workers=4,
