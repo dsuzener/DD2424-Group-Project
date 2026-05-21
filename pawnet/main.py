@@ -19,7 +19,7 @@ def main(
     stratify: bool = True,
     target_types="category",
     num_layers: int = 0,
-    batch_size: int = 64,
+    batch_size: int = 128,
     gradual_unfreezing: bool = False,
     labeled_fraction: float = 1.0,
     use_pseudolabels: bool = False,
