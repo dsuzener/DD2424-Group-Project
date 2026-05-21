@@ -6,6 +6,7 @@ from sklearn.metrics import f1_score
 from tqdm import tqdm
 import typer
 import csv
+import json
 
 from pawnet.config import MODELS_DIR, PROCESSED_DATA_DIR
 
@@ -155,6 +156,19 @@ def main(
             writer.writeheader()
             writer.writerows(prediction_rows)
         logger.success(f"Wrote predictions to {out_path}")
+
+        stats_path = run_dir / f"prediction_stats_{tag}.json"
+        stats = {
+            "model_path": model_path.relative_to(MODELS_DIR),
+            "prefer_weights": prefer_weights,
+            "forced_model_path": str(force_model_path) if force_model_path else None,
+            "accuracy": float(accuracy),
+            "f1": float(f1),
+            "f1_average": average_mode,
+            "per_class_accuracy": {str(k): float(v) for k, v in per_class_acc.items()},
+        }
+        stats_path.write_text(json.dumps(stats, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        logger.success(f"Wrote prediction stats to {stats_path}")
 
     if False:  # debug
         print("\nIncorrect predictions:")
