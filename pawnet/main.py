@@ -3,6 +3,9 @@ import typer
 from pawnet.dataset import main as dataset
 from pawnet.modeling.train import main as train
 from pawnet.modeling.predict import main as predict
+import matplotlib.pyplot as plt
+
+import torch
 
 app = typer.Typer()
 
@@ -19,7 +22,7 @@ def main(
     batch_size: int = 64,
     gradual_unfreezing: bool = False,
     augment: bool = False,
-    L2: bool = False
+    l2: float = 0.0
 ):
     print("Hello from dd2424-group-project!")
 
@@ -56,7 +59,7 @@ def main(
             batch_size=batch_size,
             stratify=stratify,
             gradual_unfreezing=gradual_unfreezing,
-            L2 = L2,
+            l2 = l2,
         )
     predict(
         val_loader=test_loader,
@@ -69,6 +72,7 @@ def main(
         gradual_unfreezing=gradual_unfreezing,
         # force_model_path=Path("models/baseline/efficientnet_b2/model_9891.pkl"),
     )
+
 
 
 if __name__ == "__main__":

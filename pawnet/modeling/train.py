@@ -35,7 +35,7 @@ def main(
     batch_size: int = 128,
     stratify: bool = True,
     gradual_unfreezing: bool = False,
-    L2: float = 0.0, 
+    l2: float = 0.0, 
 ):
     # config stuff
     # if changing the config, change the parameters of this function too!
@@ -113,7 +113,7 @@ def main(
 
     # Define loss function and optimizer
     criterion = nn.CrossEntropyLoss(weight=None)  # TODO: weights
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4, weight_decay=L2)
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
 
     # for storing metrics
     def _append_csv_row(path: Path, header: list[str], row: dict[str, object], lock: threading.Lock):
@@ -141,6 +141,10 @@ def main(
             outputs = model(images)
             loss = criterion(outputs, labels)
 
+            # L2 regularization
+            l2_reg = sum(p.pow(2).sum() for name, p in model.named_parameters() if 'bias' not in name)
+            loss = loss + l2 * l2_reg
+
             # Backward
             optimizer.zero_grad()
             loss.backward()
@@ -158,7 +162,7 @@ def main(
         num_correct = 0
         num_total = 0
         with torch.no_grad():
-            for images, labels, _ in validation_loader:
+            for images, labels, _ in tqdm(validation_loader, desc=f"Validation loss"):
                 images, labels = images.to(device), labels.to(device)
 
                 outputs = model(images)
