@@ -159,7 +159,7 @@ def main(
 
         stats_path = run_dir / f"prediction_stats_{tag}.json"
         stats = {
-            "model_path": model_path.relative_to(MODELS_DIR),
+            "model_path": str(model_path.relative_to(MODELS_DIR)),
             "prefer_weights": prefer_weights,
             "forced_model_path": str(force_model_path) if force_model_path else None,
             "accuracy": float(accuracy),
