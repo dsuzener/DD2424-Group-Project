@@ -64,3 +64,19 @@ Train with pseudo-labeling after N epochs (1-based):
 ```sh
 uv run pawnet/main.py --use-pseudolabels --pseudolabel-start-epoch 2
 ```
+
+## Modal training (remote GPU)
+
+Run this once:
+```sh
+uv sync --extra modal
+uv run modal setup
+```
+
+Training on Modal is:
+```sh
+uv run modal run pawnet/modal_app.py
+```
+
+- Set `PAWNET_MODAL_DATA_VOLUME` / `PAWNET_MODAL_MODELS_VOLUME` to override defaults.
+- Set`PAWNET_MODAL_GPU` (default `L4`) and `PAWNET_MODAL_TIMEOUT_S` (minutes, default `60`).

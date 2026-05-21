@@ -48,6 +48,7 @@ class CustomDataset(datasets.OxfordIIITPet):
         # preprocess the same split/config at the same time.
         lock_fd: int | None = None
         start = time.time()
+        last_log = 0.0
         while lock_fd is None:
             try:
                 lock_fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_RDWR)
@@ -55,6 +56,23 @@ class CustomDataset(datasets.OxfordIIITPet):
             except FileExistsError:
                 if _all_exist():
                     return
+
+                # Stale lock handling: if a previous run crashed, the lock can be left behind.
+                # If it's old, remove it and proceed.
+                try:
+                    age_s = time.time() - lock_path.stat().st_mtime
+                    if age_s > 60 * 10:
+                        logger.warning(
+                            f"Stale dataset lock detected for {split} (age={int(age_s)}s); removing {lock_path}"
+                        )
+                        lock_path.unlink(missing_ok=True)
+                        continue
+                except FileNotFoundError:
+                    continue
+
+                if (time.time() - last_log) > 5:
+                    logger.info(f"Waiting for dataset lock {lock_path} for split={split}...")
+                    last_log = time.time()
                 if time.time() - start > 60 * 30:
                     raise TimeoutError(f"Timed out waiting for dataset lock {lock_path}")
                 time.sleep(0.25)
