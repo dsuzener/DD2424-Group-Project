@@ -118,7 +118,17 @@ def main(
     for name in trainable:
         logger.info(name)
 
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        torch.backends.cudnn.benchmark = True
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+        logger.warning(
+            "CUDA/MPS not available; training will run on CPU. "
+            "If you expected a GPU (e.g. on Modal), install a CUDA-enabled PyTorch build."
+        )
     model.to(device)
 
     # Define loss function and optimizer
