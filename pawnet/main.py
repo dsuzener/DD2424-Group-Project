@@ -14,9 +14,9 @@ def main(
     epochs: int = 30,
     train_size: float = 0.90,
     stratify: bool = True,
-    target_types="binary-category",
+    target_types="category",
     num_layers: int = 0,
-    batch_size: int = 128,
+    batch_size: int = 64,
     gradual_unfreezing: bool = False,
 ):
     print("Hello from dd2424-group-project!")

@@ -88,7 +88,10 @@ def main(
         param.requires_grad = True
 
     # Optionally fine-tune the last N feature blocks
-    if num_layers > 0:
+    if gradual_unfreezing:
+        current_unfrozen = 0
+        unfreeze_layers(model, current_unfrozen, logger)
+    elif num_layers > 0:
         # EfficientNet
         if hasattr(model, "features"):
             feature_blocks = list(model.features)
@@ -130,6 +133,12 @@ def main(
     best_acc = 0.0
     epochs = max_epoch_num + epochs
     for epoch in range(max_epoch_num + 1, epochs + 1):
+        if gradual_unfreezing and (epoch - (max_epoch_num+1)) % 10 == 0:
+            current_unfrozen += 1
+            if current_unfrozen <= len(list(model.features)) and current_unfrozen <= num_layers:
+                unfreeze_layers(model, current_unfrozen, logger)
+                optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
+
         model.train()
         total_loss = 0
 
@@ -191,6 +200,24 @@ def main(
     # Save trained model
     torch.save(model.state_dict(), final_model_path)
     logger.success(f"Model trained and saved to {final_model_path}.")
+
+
+def unfreeze_layers(model, num_layers, logger):
+    if not hasattr(model, "features"):
+        return
+    
+    # Re-freeze everything first, then selectively unfreeze
+    for param in model.parameters():
+        param.requires_grad = False
+    for param in model.classifier.parameters():
+        param.requires_grad = True
+
+    if num_layers > 0:
+        feature_blocks = list(model.features)
+        for block in feature_blocks[-num_layers:]:
+            for param in block.parameters():
+                param.requires_grad = True
+        logger.info(f"Now training with last {num_layers} feature blocks unfrozen.")
 
 
 if __name__ == "__main__":
