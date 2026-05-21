@@ -1,0 +1,16 @@
+{
+  "augment": false,
+  "batch_size": 128,
+  "gradual_unfreezing": false,
+  "l2": 0.0,
+  "labeled_fraction": 0.5,
+  "model_version": "efficientnet_b2",
+  "num_layers": 4,
+  "pseudolabel_start_epoch": 1,
+  "pseudolabel_threshold": 0.9,
+  "pseudolabel_weight": 1.0,
+  "stratify": true,
+  "target_types": "category",
+  "train_size": 0.9,
+  "use_pseudolabels": true
+}
