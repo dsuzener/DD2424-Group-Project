@@ -57,6 +57,7 @@ def train_remote(
     model_version: str = "efficientnet_b2",
     epochs: int = 30,
     train_size: float = 0.90,
+    train_model: bool = True,
     stratify: bool = True,
     target_types: str = "category",
     num_layers: int = 0,
@@ -76,7 +77,7 @@ def train_remote(
 
     pawnet_main(
         model_version=model_version,
-        train_model=True,
+        train_model=train_model,
         epochs=epochs,
         train_size=train_size,
         stratify=stratify,
@@ -103,6 +104,7 @@ def main(
     model_version: str = "efficientnet_b2",
     epochs: int = 30,
     train_size: float = 0.90,
+    train_model: bool = True,
     stratify: bool = True,
     target_types: str = "category",
     num_layers: int = 0,
@@ -120,6 +122,7 @@ def main(
         model_version=model_version,
         epochs=epochs,
         train_size=train_size,
+        train_model=train_model,
         stratify=stratify,
         target_types=target_types,
         num_layers=num_layers,
