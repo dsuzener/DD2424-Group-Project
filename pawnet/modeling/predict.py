@@ -5,6 +5,7 @@ from loguru import logger
 from sklearn.metrics import f1_score
 from tqdm import tqdm
 import typer
+import csv
 
 from pawnet.config import MODELS_DIR, PROCESSED_DATA_DIR
 
@@ -39,6 +40,7 @@ def main(
     pseudolabel_start_epoch: int = 1,
     prefer_weights: str = "best",
     force_model_path: Path | None = None,
+    write_predictions: bool = True,
 ):
     run_config = RunConfig(
         model_version=model_version,
@@ -78,12 +80,15 @@ def main(
     all_preds = []
     all_labels = []
     incorrect_predictions = []
+    prediction_rows: list[dict[str, object]] = []
     for images, labels, paths in tqdm(val_loader, desc="Predicting"):
         with torch.no_grad():
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
 
             preds = outputs.argmax(dim=1)
+            probs = torch.softmax(outputs, dim=1)
+            confs = probs[torch.arange(outputs.size(0), device=outputs.device), preds]
 
             wrong_mask = preds != labels
             for i in torch.where(wrong_mask)[0]:
@@ -93,9 +98,20 @@ def main(
                         "path": paths[i],
                         "true": labels[i].item(),
                         "pred": preds[i].item(),
-                        "confidence": torch.softmax(outputs[i], dim=0)[preds[i]].item(),
+                        "confidence": probs[i, preds[i]].item(),
                     }
                 )
+
+            if write_predictions:
+                for i in range(outputs.size(0)):
+                    prediction_rows.append(
+                        {
+                            "path": paths[i],
+                            "true": int(labels[i].item()),
+                            "pred": int(preds[i].item()),
+                            "confidence": float(confs[i].item()),
+                        }
+                    )
 
             # per-class counting: count correct predictions for each class
             for clas in range(num_classes):
@@ -129,6 +145,16 @@ def main(
     print(f"F1 ({average_mode}): {f1:.4f}")
     for clas in range(num_classes):
         print(f"Class {clas} accuracy: {per_class_acc[clas]}")
+
+    if write_predictions:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        tag = "forced" if force_model_path else prefer_weights
+        out_path = run_dir / f"predictions_{tag}.csv"
+        with out_path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=["path", "true", "pred", "confidence"])
+            writer.writeheader()
+            writer.writerows(prediction_rows)
+        logger.success(f"Wrote predictions to {out_path}")
 
     if False:  # debug
         print("\nIncorrect predictions:")
