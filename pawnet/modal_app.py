@@ -64,9 +64,11 @@ def train_remote(
     gradual_unfreezing: bool = False,
     labeled_fraction: float = 1.0,
     use_pseudolabels: bool = False,
-    pseudolabel_threshold: float = 0.9,
+    pseudolabel_threshold: float = 0.5,
     pseudolabel_weight: float = 1.0,
-    pseudolabel_start_epoch: int = 1,
+    pseudolabel_start_epoch: int = 3,
+    augment: bool = False,
+    l2: float = 0.0,
 ) -> None:
     os.chdir(REMOTE_PROJECT_DIR)
 
@@ -87,6 +89,8 @@ def train_remote(
         pseudolabel_threshold=pseudolabel_threshold,
         pseudolabel_weight=pseudolabel_weight,
         pseudolabel_start_epoch=pseudolabel_start_epoch,
+        augment=augment,
+        l2=l2,
     )
 
     data_volume.commit()
@@ -109,6 +113,8 @@ def main(
     pseudolabel_threshold: float = 0.9,
     pseudolabel_weight: float = 1.0,
     pseudolabel_start_epoch: int = 1,
+    augment: bool = False,
+    l2: float = 0.0,
 ) -> None:
     kwargs = dict(
         model_version=model_version,
@@ -124,6 +130,8 @@ def main(
         pseudolabel_threshold=pseudolabel_threshold,
         pseudolabel_weight=pseudolabel_weight,
         pseudolabel_start_epoch=pseudolabel_start_epoch,
+        augment=augment,
+        l2=l2,
     )
     if detach:
         call = train_remote.spawn(**kwargs)
