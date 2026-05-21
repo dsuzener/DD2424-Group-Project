@@ -3,6 +3,9 @@ import typer
 from pawnet.dataset import main as dataset
 from pawnet.modeling.train import main as train
 from pawnet.modeling.predict import main as predict
+import matplotlib.pyplot as plt
+
+import torch
 
 app = typer.Typer()
 
@@ -16,13 +19,15 @@ def main(
     stratify: bool = True,
     target_types="category",
     num_layers: int = 0,
-    batch_size: int = 128,
+    batch_size: int = 64,
     gradual_unfreezing: bool = False,
     labeled_fraction: float = 1.0,
     use_pseudolabels: bool = False,
     pseudolabel_threshold: float = 0.9,
     pseudolabel_weight: float = 1.0,
     pseudolabel_start_epoch: int = 1,
+    augment: bool = False,
+    l2: float = 0.0,
 ):
     print("Hello from dd2424-group-project!")
 
@@ -46,6 +51,7 @@ def main(
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
         labeled_fraction=labeled_fraction,
+        augment=augment,
     )
     unlabeled_loader = None
     if isinstance(trainval_result, tuple) and len(trainval_result) == 3: # this is a bit scuffed but it works
@@ -71,6 +77,7 @@ def main(
             pseudolabel_threshold=pseudolabel_threshold,
             pseudolabel_weight=pseudolabel_weight,
             pseudolabel_start_epoch=pseudolabel_start_epoch,
+            l2=l2,
         )
     predict(
         val_loader=test_loader,
@@ -87,6 +94,7 @@ def main(
         pseudolabel_weight=pseudolabel_weight,
         pseudolabel_start_epoch=pseudolabel_start_epoch,
     )
+
 
 
 if __name__ == "__main__":

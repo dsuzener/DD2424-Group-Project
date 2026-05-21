@@ -41,6 +41,7 @@ def main(
     pseudolabel_threshold: float = 0.9,
     pseudolabel_weight: float = 1.0,
     pseudolabel_start_epoch: int = 1,
+    l2: float = 0.0,
 ):
     # config stuff
     # if changing the config, change the parameters of this function too!
@@ -196,6 +197,12 @@ def main(
                     total_unsup_kept += int(keep.sum().item())
                     unsup_loss = criterion(u_logits[keep], u_pseudo[keep])
                     loss = loss + (pseudolabel_weight * unsup_loss)
+            # L2 regularization (simple weight decay term)
+            if l2 > 0:
+                l2_reg = sum(
+                    p.pow(2).sum() for name, p in model.named_parameters() if "bias" not in name
+                )
+                loss = loss + (l2 * l2_reg)
 
             # Backward
             optimizer.zero_grad()
@@ -217,7 +224,7 @@ def main(
         num_correct = 0
         num_total = 0
         with torch.no_grad():
-            for images, labels, _ in validation_loader:
+            for images, labels, _ in tqdm(validation_loader, desc=f"Validation loss"):
                 images, labels = images.to(device), labels.to(device)
 
                 outputs = model(images)
