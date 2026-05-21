@@ -17,7 +17,9 @@ classifiers = [
 ]
 dependencies = [
     "loguru",
+    "matplotlib>=3.10.9",
     "mkdocs",
+    "modal>=1.4.3",
     "pip",
     "pytest",
     "python-dotenv",
