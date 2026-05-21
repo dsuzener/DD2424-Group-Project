@@ -70,6 +70,7 @@ def train_remote(
     pseudolabel_start_epoch: int = 3,
     augment: bool = False,
     l2: float = 0.0,
+    use_fixmatch: bool = False,
 ) -> None:
     os.chdir(REMOTE_PROJECT_DIR)
 
@@ -92,6 +93,7 @@ def train_remote(
         pseudolabel_start_epoch=pseudolabel_start_epoch,
         augment=augment,
         l2=l2,
+        use_fixmatch=use_fixmatch,
     )
 
     data_volume.commit()
@@ -117,6 +119,7 @@ def main(
     pseudolabel_start_epoch: int = 1,
     augment: bool = False,
     l2: float = 0.0,
+    use_fixmatch: bool = False,
 ) -> None:
     kwargs = dict(
         model_version=model_version,
@@ -135,6 +138,7 @@ def main(
         pseudolabel_start_epoch=pseudolabel_start_epoch,
         augment=augment,
         l2=l2,
+        use_fixmatch=use_fixmatch,
     )
     if detach:
         call = train_remote.spawn(**kwargs)

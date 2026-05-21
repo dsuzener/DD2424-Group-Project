@@ -44,6 +44,7 @@ def main(
     prefer_weights: str = "best",
     force_model_path: Path | None = None,
     write_predictions: bool = True,
+    use_fixmatch: bool = False,
 ):
     run_config = RunConfig(
         model_version=model_version,
@@ -56,26 +57,31 @@ def main(
         gradual_unfreezing=gradual_unfreezing,
         augment=augment,
         l2=l2,
+        use_fixmatch=use_fixmatch,
         use_pseudolabels=use_pseudolabels,
         pseudolabel_threshold=pseudolabel_threshold,
         pseudolabel_weight=pseudolabel_weight,
         pseudolabel_start_epoch=pseudolabel_start_epoch,
     )
-    run_dir = get_run_dir(run_config)
-    model_path = resolve_model_path_for_predict(run_dir, prefer=prefer_weights)
     num_outputs = 2 if target_types == "binary-category" else 37
     if force_model_path and force_model_path.exists():
-        logger.info(f"Using forced model path: {force_model_path}")
+        logger.warning(f"Force model path provided: {force_model_path}")
+        run_dir = force_model_path.parent.parent
         model_path = force_model_path
+    else:
+        run_dir = get_run_dir(run_config)
+        model_path = resolve_model_path_for_predict(run_dir, prefer=prefer_weights)
+    run_dir = run_dir.resolve()
+    model_path = model_path.resolve()
 
     logger.info(f"Loading model weights from {model_path}")
     model, _ = get_model(model_version=model_version, use_weights=False)
     model.classifier[1] = nn.Linear(cast(nn.Linear, model.classifier[1]).in_features, num_outputs)
-    model.load_state_dict(torch.load(model_path, weights_only=True))
-    model.eval()
-
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+    model.eval()
     model.to(device)
+
 
     # use the same number of classes as model outputs
     num_classes = num_outputs
@@ -162,8 +168,16 @@ def main(
         logger.success(f"Wrote predictions to {out_path}")
 
         stats_path = run_dir / f"prediction_stats_{tag}.json"
+        if force_model_path:
+            model_path_str = ""
+        else:
+            try:
+                model_path_str = str(model_path.resolve().relative_to(MODELS_DIR.resolve()))
+            except ValueError:
+                model_path_str = str(model_path.resolve())
+            
         stats = {
-            "model_path": str(model_path.relative_to(MODELS_DIR)),
+            "model_path": model_path_str,
             "prefer_weights": prefer_weights,
             "forced_model_path": str(force_model_path) if force_model_path else None,
             "accuracy": float(accuracy),

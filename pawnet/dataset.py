@@ -156,6 +156,36 @@ class UnlabeledView(torch.utils.data.Dataset):
         x, _y, path = self.base[idx]
         return x, path
 
+class FixMatchUnlabeled(torch.utils.data.Dataset):
+    def __init__(
+        self,
+        base,
+        weak_transform=None,
+        strong_transform=None,
+    ):
+        self.base = base
+        self.weak_transform = weak_transform
+        self.strong_transform = strong_transform
+
+    def __len__(self):
+        return len(self.base)
+
+    def __getitem__(self, idx):
+        x, _y, path = self.base[idx]
+
+        weak_x = (
+            self.weak_transform(x)
+            if self.weak_transform
+            else x
+        )
+
+        strong_x = (
+            self.strong_transform(x)
+            if self.strong_transform
+            else x
+        )
+
+        return weak_x, strong_x, path
 
 @app.command()
 def main(
@@ -170,6 +200,7 @@ def main(
     gradual_unfreezing: bool = False,
     labeled_fraction: float = 1.0,
     augment: bool = False,
+    use_fixmatch: bool = False,
 ):
     run_config = RunConfig(
         model_version=model_version,
@@ -245,12 +276,8 @@ def main(
             v2.Compose(
                 [
                     v2.RandomHorizontalFlip(p=0.5),
-                    v2.RandomRotation((-15, 15)),
-                    v2.RandomResizedCrop(size=(260, 260), scale=(0.7, 1.0)),
-                    v2.Normalize(
-                        mean=[0.485, 0.456, 0.406],
-                        std=[0.229, 0.224, 0.225],
-                    ),
+                    v2.RandomRotation((-5, 5)),
+                    v2.RandomResizedCrop(size=(260, 260), scale=(0.9, 1.0)),
                 ]
             )
             if augment
@@ -273,7 +300,37 @@ def main(
                 generator=torch.Generator().manual_seed(42),
             )
             labeled_ds = Subset(full_train_ds, cast(list[int], labeled_split.indices))
-            unlabeled_ds = UnlabeledView(Subset(full_train_ds, cast(list[int], unlabeled_split.indices)))
+            subset = Subset(
+                full_train_ds,
+                cast(list[int], unlabeled_split.indices),
+            )
+
+            if use_fixmatch:
+                weak_transform = v2.Compose([
+                    v2.RandomHorizontalFlip(p=0.5),
+                ])
+                strong_transform = v2.Compose([
+                    v2.RandomHorizontalFlip(p=0.5),
+                    v2.RandomRotation((-30, 30)),
+                    v2.RandomResizedCrop(
+                        size=(260, 260),
+                        scale=(0.5, 1.0),
+                    ),
+                    v2.ColorJitter(
+                        brightness=0.4,
+                        contrast=0.4,
+                        saturation=0.4,
+                        hue=0.1,
+                    ),
+                    v2.RandomErasing(p=0.25),
+                ])
+                unlabeled_ds = FixMatchUnlabeled(
+                    subset,
+                    weak_transform=weak_transform,
+                    strong_transform=strong_transform,
+                )
+            else:
+                unlabeled_ds = UnlabeledView(subset)
 
             train_ds_for_loader = labeled_ds
             unlabeled_loader = DataLoader(

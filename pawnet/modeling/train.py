@@ -43,6 +43,7 @@ def main(
     pseudolabel_start_epoch: int = 1,
     augment: bool = False,
     l2: float = 0.0,
+    use_fixmatch: bool = False,
 ):
     # config stuff
     # if changing the config, change the parameters of this function too!
@@ -61,6 +62,7 @@ def main(
         pseudolabel_threshold=pseudolabel_threshold,
         pseudolabel_weight=pseudolabel_weight,
         pseudolabel_start_epoch=pseudolabel_start_epoch,
+        use_fixmatch=use_fixmatch,
     )
     run_dir = ensure_run_dir(run_config)
     best_model_path = run_dir / "best.pt"
@@ -190,25 +192,76 @@ def main(
 
             unsup_loss = None
             if use_unsup and unlabeled_iter is not None:
-                # get unlabeled batch and loop around if end
-                try:
-                    u_images, _u_paths = next(unlabeled_iter)
-                except StopIteration:
-                    unlabeled_iter = iter(unlabeled_loader)
-                    u_images, _u_paths = next(unlabeled_iter)
+                if use_fixmatch:
 
-                u_images = u_images.to(device)
-                u_logits = model(u_images)
-                u_probs = torch.softmax(u_logits, dim=1)
-                u_conf, u_pseudo = torch.max(u_probs, dim=1)
-                keep = u_conf >= pseudolabel_threshold
-                total_unsup_seen += int(u_images.size(0))
+                    try:
+                        u_weak, u_strong, _u_paths = next(unlabeled_iter)
+                    except StopIteration:
+                        unlabeled_iter = iter(unlabeled_loader)
+                        u_weak, u_strong, _u_paths = next(unlabeled_iter)
 
-                # Only keep if above threshold
-                if keep.any():
-                    total_unsup_kept += int(keep.sum().item())
-                    unsup_loss = criterion(u_logits[keep], u_pseudo[keep])
-                    loss = loss + (pseudolabel_weight * unsup_loss)
+                    u_weak = u_weak.to(device)
+                    u_strong = u_strong.to(device)
+
+                    with torch.no_grad():
+                        weak_logits = model(u_weak)
+
+                        weak_probs = torch.softmax(
+                            weak_logits / 0.5,
+                            dim=1,
+                        )
+
+                        u_conf, u_pseudo = torch.max(
+                            weak_probs,
+                            dim=1,
+                        )
+
+                    keep = (
+                        u_conf >= pseudolabel_threshold
+                    )
+
+                    total_unsup_seen += int(
+                        u_weak.size(0)
+                    )
+
+                    if keep.any():
+                        total_unsup_kept += int(
+                            keep.sum().item()
+                        )
+
+                        strong_logits = model(
+                            u_strong
+                        )
+
+                        unsup_loss = criterion(
+                            strong_logits[keep],
+                            u_pseudo[keep],
+                        )
+
+                        loss = loss + (
+                            pseudolabel_weight
+                            * unsup_loss
+                        )
+                else:
+                    # get unlabeled batch and loop around if end
+                    try:
+                        u_images, _u_paths = next(unlabeled_iter)
+                    except StopIteration:
+                        unlabeled_iter = iter(unlabeled_loader)
+                        u_images, _u_paths = next(unlabeled_iter)
+
+                    u_images = u_images.to(device)
+                    u_logits = model(u_images)
+                    u_probs = torch.softmax(u_logits, dim=1)
+                    u_conf, u_pseudo = torch.max(u_probs, dim=1)
+                    keep = u_conf >= pseudolabel_threshold
+                    total_unsup_seen += int(u_images.size(0))
+
+                    # Only keep if above threshold
+                    if keep.any():
+                        total_unsup_kept += int(keep.sum().item())
+                        unsup_loss = criterion(u_logits[keep], u_pseudo[keep])
+                        loss = loss + (pseudolabel_weight * unsup_loss)
             # L2 regularization (simple weight decay term)
             if l2 > 0:
                 l2_reg = sum(

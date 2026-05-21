@@ -28,6 +28,8 @@ def main(
     pseudolabel_start_epoch: int = 1,
     augment: bool = False,
     l2: float = 0.0,
+    use_fixmatch: bool = False,
+    force_model_path: Path | None = None,
 ):
     print("Hello from dd2424-group-project!")
 
@@ -52,6 +54,7 @@ def main(
         gradual_unfreezing=gradual_unfreezing,
         labeled_fraction=labeled_fraction,
         augment=augment,
+        use_fixmatch=use_fixmatch,
     )
     unlabeled_loader = None
     if isinstance(trainval_result, tuple) and len(trainval_result) == 3: # this is a bit scuffed but it works
@@ -79,6 +82,7 @@ def main(
             pseudolabel_start_epoch=pseudolabel_start_epoch,
             augment=augment,
             l2=l2,
+            use_fixmatch=use_fixmatch,
         )
     predict(
         val_loader=test_loader,
@@ -88,6 +92,7 @@ def main(
         batch_size=batch_size,
         stratify=stratify,
         num_layers=num_layers,
+        force_model_path=force_model_path,
         gradual_unfreezing=gradual_unfreezing,
         labeled_fraction=labeled_fraction,
         use_pseudolabels=use_pseudolabels,
@@ -96,6 +101,7 @@ def main(
         pseudolabel_start_epoch=pseudolabel_start_epoch,
         augment=augment,
         l2=l2,
+        use_fixmatch=use_fixmatch,
     )
 
 

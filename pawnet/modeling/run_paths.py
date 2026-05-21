@@ -50,6 +50,7 @@ class RunConfig:
     pseudolabel_threshold: float = 0.9
     pseudolabel_weight: float = 1.0
     pseudolabel_start_epoch: int = 1
+    use_fixmatch: bool = False
 
     def folder_parts(self) -> list[str]:
         parts = [
@@ -73,6 +74,7 @@ class RunConfig:
                     f"plstart={self.pseudolabel_start_epoch}",
                 ]
             )
+        parts.append(f"fixmatch={int(self.use_fixmatch)}")
         return parts
 
 # function to get run dir path from config (doesn't create)
