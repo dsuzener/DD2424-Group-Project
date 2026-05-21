@@ -41,6 +41,7 @@ def main(
     pseudolabel_threshold: float = 0.9,
     pseudolabel_weight: float = 1.0,
     pseudolabel_start_epoch: int = 1,
+    augment: bool = False,
     l2: float = 0.0,
 ):
     # config stuff
@@ -54,6 +55,8 @@ def main(
         stratify=stratify,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        augment=augment,
+        l2=l2,
         use_pseudolabels=use_pseudolabels,
         pseudolabel_threshold=pseudolabel_threshold,
         pseudolabel_weight=pseudolabel_weight,

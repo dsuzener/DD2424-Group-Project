@@ -77,6 +77,7 @@ def main(
             pseudolabel_threshold=pseudolabel_threshold,
             pseudolabel_weight=pseudolabel_weight,
             pseudolabel_start_epoch=pseudolabel_start_epoch,
+            augment=augment,
             l2=l2,
         )
     predict(
@@ -93,6 +94,8 @@ def main(
         pseudolabel_threshold=pseudolabel_threshold,
         pseudolabel_weight=pseudolabel_weight,
         pseudolabel_start_epoch=pseudolabel_start_epoch,
+        augment=augment,
+        l2=l2,
     )
 
 

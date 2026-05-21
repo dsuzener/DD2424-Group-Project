@@ -18,8 +18,21 @@ def _slug(value: object) -> str:
 
 # function to render flaots for dir names
 def _float_folder(value: float) -> str:
+    # avoid locale issues with commas and avoid rounding tiny values
+    if value == 0:
+        return "0"
+
+    abs_value = abs(value)
+    if abs_value < 1e-4 or abs_value >= 1e4:
+        # scientific
+        text = f"{value:.12e}"
+        mantissa, exp = text.split("e", 1)
+        mantissa = mantissa.rstrip("0").rstrip(".")
+        exp = str(int(exp))  # drop leading + and zeros
+        return f"{mantissa}e{exp}".replace(".", "p")
+
     # need to do this instead of float rendering sqtuff to avoid locale issues with commas
-    return f"{value:.4f}".rstrip("0").rstrip(".").replace(".", "p")
+    return f"{value:.6f}".rstrip("0").rstrip(".").replace(".", "p")
 
 @dataclass(frozen=True)
 class RunConfig:
@@ -31,6 +44,8 @@ class RunConfig:
     stratify: bool
     num_layers: int
     gradual_unfreezing: bool
+    augment: bool = False
+    l2: float = 0.0
     use_pseudolabels: bool = False
     pseudolabel_threshold: float = 0.9
     pseudolabel_weight: float = 1.0
@@ -47,6 +62,8 @@ class RunConfig:
             f"layers={self.num_layers}",
             f"gradual={int(self.gradual_unfreezing)}",
         ]
+        parts.append(f"augment={int(self.augment)}")
+        parts.append(f"l2={_float_folder(self.l2)}")
         parts.append(f"pseudolabels={int(self.use_pseudolabels)}")
         if self.use_pseudolabels:
             parts.extend(
@@ -138,19 +155,18 @@ def find_latest_checkpoint(run_dir: Path) -> tuple[int, Path] | None:
 
 
 def resolve_model_path_for_predict(run_dir: Path, prefer: str = "best") -> Path:
-    match prefer:
-        case "best":
-            path = run_dir / "best.pt"
-            if path.exists():
-                return path
-        case "final":
-            path = run_dir / "final.pt"
-            if path.exists():
-                return path
-        case "latest":
-            latest = find_latest_checkpoint(run_dir)
-            if latest:
-                return latest[1]
+    if prefer == "best":
+        path = run_dir / "best.pt"
+        if path.exists():
+            return path
+    elif prefer == "final":
+        path = run_dir / "final.pt"
+        if path.exists():
+            return path
+    elif prefer == "latest":
+        latest = find_latest_checkpoint(run_dir)
+        if latest:
+            return latest[1]
             
     # fallback priority
     for candidate in [run_dir / "best.pt", run_dir / "final.pt"]:

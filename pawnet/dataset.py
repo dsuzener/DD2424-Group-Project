@@ -180,6 +180,7 @@ def main(
         stratify=stratify,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        augment=augment,
     )
     processed_dir = ensure_processed_dir(run_config)
 
