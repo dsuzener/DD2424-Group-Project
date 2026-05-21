@@ -35,6 +35,7 @@ def main(
         train_size=train_size,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        labeled_fraction=labeled_fraction,
     )
     trainval_result = dataset(
         target_types=target_types,

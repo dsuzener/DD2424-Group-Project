@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+import time
 from typing import cast
 
 from loguru import logger
@@ -34,29 +36,73 @@ class CustomDataset(datasets.OxfordIIITPet):
         features_path = processed_dir / f"{split}_features.pt"
         labels_path = processed_dir / f"{split}_labels.pt"
         paths_path = processed_dir / f"{split}_paths.pt"
+        lock_path = processed_dir / f".{split}.lock"
 
-        if features_path.exists() and labels_path.exists() and paths_path.exists():
+        def _all_exist() -> bool:
+            return features_path.exists() and labels_path.exists() and paths_path.exists()
+
+        if _all_exist():
             return
 
-        if indices is None:
-            indices = list(range(len(self)))
+        # Prevent concurrent writers corrupting torch.save output when multiple runs
+        # preprocess the same split/config at the same time.
+        lock_fd: int | None = None
+        start = time.time()
+        while lock_fd is None:
+            try:
+                lock_fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_RDWR)
+                os.write(lock_fd, f"pid={os.getpid()}\n".encode("utf-8"))
+            except FileExistsError:
+                if _all_exist():
+                    return
+                if time.time() - start > 60 * 30:
+                    raise TimeoutError(f"Timed out waiting for dataset lock {lock_path}")
+                time.sleep(0.25)
 
-        features, labels, image_paths = [], [], []
+        try:
+            # Re-check after acquiring lock in case another process finished.
+            if _all_exist():
+                return
 
-        for i in tqdm(indices, desc=f"Preprocessing {split} dataset"):
-            img, label = self[i]
-            features.append(img)
-            labels.append(label)
-            image_paths.append(str(self._images[i]))
+            if indices is None:
+                indices = list(range(len(self)))
 
-        features_tensor = torch.stack(features)
-        labels_tensor = torch.tensor(labels)
+            features, labels, image_paths = [], [], []
 
-        torch.save(features_tensor, features_path)
-        torch.save(labels_tensor, labels_path)
-        torch.save(image_paths, paths_path)
+            for i in tqdm(indices, desc=f"Preprocessing {split} dataset"):
+                img, label = self[i]
+                features.append(img)
+                labels.append(label)
+                image_paths.append(str(self._images[i]))
 
-        logger.success(f"Preprocessed {split} dataset saved to {features_path} and {labels_path}.")
+            features_tensor = torch.stack(features)
+            labels_tensor = torch.tensor(labels)
+
+            # Atomic-ish writes: write to temp then replace.
+            tmp_features = processed_dir / f".{split}_features.pt.tmp"
+            tmp_labels = processed_dir / f".{split}_labels.pt.tmp"
+            tmp_paths = processed_dir / f".{split}_paths.pt.tmp"
+
+            torch.save(features_tensor, tmp_features)
+            torch.save(labels_tensor, tmp_labels)
+            torch.save(image_paths, tmp_paths)
+
+            os.replace(tmp_features, features_path)
+            os.replace(tmp_labels, labels_path)
+            os.replace(tmp_paths, paths_path)
+
+            logger.success(
+                f"Preprocessed {split} dataset saved to {features_path} and {labels_path}."
+            )
+        finally:
+            try:
+                if lock_fd is not None:
+                    os.close(lock_fd)
+            finally:
+                try:
+                    lock_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
 
 
 class ProcessedDataset(torch.utils.data.Dataset):
