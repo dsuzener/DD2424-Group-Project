@@ -143,7 +143,7 @@ def main(
             dataset.save_preprocessed_dataset(
                 processed_dir,
                 "val",
-                val_indices,
+                val_indices[:int(len(dataset) * min(0.2, 1 - train_size))],  # Use max 20% for validation
             )
         else:
             train_set, val_set = random_split(
