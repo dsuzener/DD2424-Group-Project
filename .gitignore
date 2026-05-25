@@ -1,4 +1,7 @@
 # Models
+pawnet-models/*
+*.pt
+predictions_best.csv
 models/*
 !models/.gitkeep
 !models/efficientnet_b0/epoch_50.pkl

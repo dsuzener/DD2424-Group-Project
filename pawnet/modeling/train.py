@@ -33,6 +33,7 @@ def compute_class_weights(train_loader, num_classes: int, device):
 def main(
     train_loader,
     validation_loader,
+    unlabeled_loader=None,
     model_version: str = "efficientnet_b0",
     features_path: Path = PROCESSED_DATA_DIR / "features.csv",
     labels_path: Path = PROCESSED_DATA_DIR / "labels.csv",
@@ -45,6 +46,14 @@ def main(
     gradual_unfreezing: bool = False,
     imbalanced_training=False,
     weighted_loss=False,
+    labeled_fraction: float = 1.0,
+    use_pseudolabels: bool = False,
+    pseudolabel_threshold: float = 0.9,
+    pseudolabel_weight: float = 1.0,
+    pseudolabel_start_epoch: int = 1,
+    augment: bool = False,
+    l2: float = 0.0,
+    use_fixmatch: bool = False,
 ):
     # config stuff
     # if changing the config, change the parameters of this function too!
@@ -52,12 +61,20 @@ def main(
         model_version=model_version,
         target_types=target_types,
         train_size=train_size,
+        labeled_fraction=labeled_fraction,
         batch_size=batch_size,
         stratify=stratify,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
         imbalanced_training=imbalanced_training,
         weighted_loss=weighted_loss,
+        augment=augment,
+        l2=l2,
+        use_pseudolabels=use_pseudolabels,
+        pseudolabel_threshold=pseudolabel_threshold,
+        pseudolabel_weight=pseudolabel_weight,
+        pseudolabel_start_epoch=pseudolabel_start_epoch,
+        use_fixmatch=use_fixmatch,
     )
     run_dir = ensure_run_dir(run_config)
     best_model_path = run_dir / "best.pt"
@@ -100,7 +117,10 @@ def main(
         param.requires_grad = True
 
     # Optionally fine-tune the last N feature blocks
-    if num_layers > 0:
+    if gradual_unfreezing:
+        current_unfrozen = 0
+        unfreeze_layers(model, current_unfrozen, logger)
+    elif num_layers > 0:
         # EfficientNet
         if hasattr(model, "features"):
             feature_blocks = list(model.features)
@@ -119,7 +139,17 @@ def main(
     for name in trainable:
         logger.info(name)
 
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        torch.backends.cudnn.benchmark = True
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+        logger.warning(
+            "CUDA/MPS not available; training will run on CPU. "
+            "If you expected a GPU (e.g. on Modal), install a CUDA-enabled PyTorch build."
+        )
     model.to(device)
 
     # Define loss function and optimizer
@@ -146,8 +176,28 @@ def main(
     best_acc = 0.0
     epochs = max_epoch_num + epochs
     for epoch in range(max_epoch_num + 1, epochs + 1):
+        if gradual_unfreezing and (epoch - (max_epoch_num+1)) % 10 == 0:
+            current_unfrozen += 1
+            if current_unfrozen <= len(list(model.features)) and current_unfrozen <= num_layers:
+                unfreeze_layers(model, current_unfrozen, logger)
+                optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
+
         model.train()
         total_loss = 0
+
+        # pseudolabeling stats
+        total_unsup_loss = 0.0
+        total_unsup_kept = 0
+        total_unsup_seen = 0
+
+        use_unsup = (
+            use_pseudolabels
+            and unlabeled_loader is not None
+            and epoch >= pseudolabel_start_epoch
+            and pseudolabel_weight > 0.0
+        )
+
+        unlabeled_iter = iter(unlabeled_loader) if use_unsup else None
 
         for images, labels, _ in tqdm(train_loader, desc=f"Epoch {epoch}/{epochs}"):
             images, labels = images.to(device), labels.to(device)
@@ -155,6 +205,85 @@ def main(
             # Forward
             outputs = model(images)
             loss = criterion(outputs, labels)
+
+            unsup_loss = None
+            if use_unsup and unlabeled_iter is not None:
+                if use_fixmatch:
+
+                    try:
+                        u_weak, u_strong, _u_paths = next(unlabeled_iter)
+                    except StopIteration:
+                        unlabeled_iter = iter(unlabeled_loader)
+                        u_weak, u_strong, _u_paths = next(unlabeled_iter)
+
+                    u_weak = u_weak.to(device)
+                    u_strong = u_strong.to(device)
+
+                    with torch.no_grad():
+                        weak_logits = model(u_weak)
+
+                        weak_probs = torch.softmax(
+                            weak_logits / 0.5,
+                            dim=1,
+                        )
+
+                        u_conf, u_pseudo = torch.max(
+                            weak_probs,
+                            dim=1,
+                        )
+
+                    keep = (
+                        u_conf >= pseudolabel_threshold
+                    )
+
+                    total_unsup_seen += int(
+                        u_weak.size(0)
+                    )
+
+                    if keep.any():
+                        total_unsup_kept += int(
+                            keep.sum().item()
+                        )
+
+                        strong_logits = model(
+                            u_strong
+                        )
+
+                        unsup_loss = criterion(
+                            strong_logits[keep],
+                            u_pseudo[keep],
+                        )
+
+                        loss = loss + (
+                            pseudolabel_weight
+                            * unsup_loss
+                        )
+                else:
+                    # get unlabeled batch and loop around if end
+                    try:
+                        u_images, _u_paths = next(unlabeled_iter)
+                    except StopIteration:
+                        unlabeled_iter = iter(unlabeled_loader)
+                        u_images, _u_paths = next(unlabeled_iter)
+
+                    u_images = u_images.to(device)
+                    u_logits = model(u_images)
+                    u_probs = torch.softmax(u_logits, dim=1)
+                    u_conf, u_pseudo = torch.max(u_probs, dim=1)
+                    keep = u_conf >= pseudolabel_threshold
+                    total_unsup_seen += int(u_images.size(0))
+
+                    # Only keep if above threshold
+                    if keep.any():
+                        total_unsup_kept += int(keep.sum().item())
+                        unsup_loss = criterion(u_logits[keep], u_pseudo[keep])
+                        loss = loss + (pseudolabel_weight * unsup_loss)
+            # L2 regularization (simple weight decay term)
+            if l2 > 0:
+                l2_reg = sum(
+                    p.pow(2).sum() for name, p in model.named_parameters() if "bias" not in name
+                )
+                loss = loss + (l2 * l2_reg)
 
             # Backward
             optimizer.zero_grad()
@@ -164,8 +293,11 @@ def main(
             optimizer.step()
 
             total_loss += loss.item()
+            if unsup_loss is not None:
+                total_unsup_loss += float(unsup_loss.item())
 
         avg_loss = total_loss / len(train_loader)
+        avg_unsup_loss = (total_unsup_loss / max(1, len(train_loader))) if use_unsup else 0.0
 
         # Evaluate on validation set
         model.eval()
@@ -173,7 +305,7 @@ def main(
         num_correct = 0
         num_total = 0
         with torch.no_grad():
-            for images, labels, _ in validation_loader:
+            for images, labels, _ in tqdm(validation_loader, desc=f"Validation loss"):
                 images, labels = images.to(device), labels.to(device)
 
                 outputs = model(images)
@@ -185,11 +317,25 @@ def main(
 
         val_acc = num_correct / num_total
 
-        print(f"Epoch {epoch}/{epochs} loss={avg_loss:.4f} val_acc={val_acc:.4f}")
+        # PSeudolabing stats logging
+        extras = ""
+        if use_unsup:
+            extras = (
+                f" unsup_loss={avg_unsup_loss:.4f}"
+                f" kept={total_unsup_kept}/{total_unsup_seen}"
+            )
+        print(f"Epoch {epoch}/{epochs} loss={avg_loss:.4f} val_acc={val_acc:.4f}{extras}")
         _append_csv_row(
             metrics_csv_path,
-            header=["epoch", "loss", "val_acc"],
-            row={"epoch": epoch, "loss": avg_loss, "val_acc": val_acc},
+            header=["epoch", "loss", "val_acc", "unsup_loss", "unsup_kept", "unsup_seen"],
+            row={
+                "epoch": epoch,
+                "loss": avg_loss,
+                "val_acc": val_acc,
+                "unsup_loss": avg_unsup_loss if use_unsup else "",
+                "unsup_kept": total_unsup_kept if use_unsup else "",
+                "unsup_seen": total_unsup_seen if use_unsup else "",
+            },
             lock=metrics_lock,
         )
 
@@ -207,6 +353,24 @@ def main(
     # Save trained model
     torch.save(model.state_dict(), final_model_path)
     logger.success(f"Model trained and saved to {final_model_path}.")
+
+
+def unfreeze_layers(model, num_layers, logger):
+    if not hasattr(model, "features"):
+        return
+    
+    # Re-freeze everything first, then selectively unfreeze
+    for param in model.parameters():
+        param.requires_grad = False
+    for param in model.classifier.parameters():
+        param.requires_grad = True
+
+    if num_layers > 0:
+        feature_blocks = list(model.features)
+        for block in feature_blocks[-num_layers:]:
+            for param in block.parameters():
+                param.requires_grad = True
+        logger.info(f"Now training with last {num_layers} feature blocks unfrozen.")
 
 
 if __name__ == "__main__":

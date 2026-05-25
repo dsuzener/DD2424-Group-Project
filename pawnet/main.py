@@ -3,6 +3,9 @@ import typer
 from pawnet.dataset import main as dataset
 from pawnet.modeling.train import main as train
 from pawnet.modeling.predict import main as predict
+import matplotlib.pyplot as plt
+
+import torch
 
 app = typer.Typer()
 
@@ -14,10 +17,19 @@ def main(
     epochs: int = 30,
     train_size: float = 0.90,
     stratify: bool = True,
-    target_types="binary-category",
+    target_types="category",
     num_layers: int = 0,
     batch_size: int = 128,
     gradual_unfreezing: bool = False,
+    labeled_fraction: float = 1.0,
+    use_pseudolabels: bool = False,
+    pseudolabel_threshold: float = 0.9,
+    pseudolabel_weight: float = 1.0,
+    pseudolabel_start_epoch: int = 1,
+    augment: bool = False,
+    l2: float = 0.0,
+    use_fixmatch: bool = False,
+    force_model_path: Path | None = None,
     imbalanced_training: bool = False,
     weighted_loss: bool = False,
     
@@ -35,8 +47,9 @@ def main(
         gradual_unfreezing=gradual_unfreezing,
         imbalanced_training=False,
         weighted_loss=False,
+        labeled_fraction=labeled_fraction,
     )
-    train_loader, validation_loader = dataset(
+    trainval_result = dataset(
         target_types=target_types,
         train_size=train_size,
         model_version=model_version,
@@ -46,12 +59,21 @@ def main(
         gradual_unfreezing=gradual_unfreezing,
         imbalanced_training=imbalanced_training,
         weighted_loss=weighted_loss,
+        labeled_fraction=labeled_fraction,
+        augment=augment,
+        use_fixmatch=use_fixmatch,
     )
+    unlabeled_loader = None
+    if isinstance(trainval_result, tuple) and len(trainval_result) == 3: # this is a bit scuffed but it works
+        train_loader, validation_loader, unlabeled_loader = trainval_result
+    else:
+        train_loader, validation_loader = trainval_result
 
     if train_model:
         train(
             train_loader=train_loader,
             validation_loader=validation_loader,
+            unlabeled_loader=unlabeled_loader,
             model_version=model_version,
             epochs=epochs,
             target_types=target_types,
@@ -62,6 +84,14 @@ def main(
             gradual_unfreezing=gradual_unfreezing,
             imbalanced_training=imbalanced_training,
             weighted_loss=weighted_loss,
+            labeled_fraction=labeled_fraction,
+            use_pseudolabels=use_pseudolabels,
+            pseudolabel_threshold=pseudolabel_threshold,
+            pseudolabel_weight=pseudolabel_weight,
+            pseudolabel_start_epoch=pseudolabel_start_epoch,
+            augment=augment,
+            l2=l2,
+            use_fixmatch=use_fixmatch,
         )
     predict(
         val_loader=test_loader,
@@ -71,11 +101,21 @@ def main(
         batch_size=batch_size,
         stratify=stratify,
         num_layers=num_layers,
+        force_model_path=force_model_path,
         gradual_unfreezing=gradual_unfreezing,
         imbalanced_training=imbalanced_training,
         weighted_loss=weighted_loss,
         # force_model_path=Path("models/baseline/efficientnet_b2/model_9891.pkl"),
+        labeled_fraction=labeled_fraction,
+        use_pseudolabels=use_pseudolabels,
+        pseudolabel_threshold=pseudolabel_threshold,
+        pseudolabel_weight=pseudolabel_weight,
+        pseudolabel_start_epoch=pseudolabel_start_epoch,
+        augment=augment,
+        l2=l2,
+        use_fixmatch=use_fixmatch,
     )
+
 
 
 if __name__ == "__main__":

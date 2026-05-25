@@ -5,6 +5,8 @@ from loguru import logger
 from sklearn.metrics import f1_score
 from tqdm import tqdm
 import typer
+import csv
+import json
 
 from pawnet.config import MODELS_DIR, PROCESSED_DATA_DIR
 
@@ -32,37 +34,58 @@ def main(
     stratify: bool = True,
     num_layers: int = 0,
     gradual_unfreezing: bool = False,
+    labeled_fraction: float = 1.0,
+    use_pseudolabels: bool = False,
+    pseudolabel_threshold: float = 0.9,
+    pseudolabel_weight: float = 1.0,
+    pseudolabel_start_epoch: int = 1,
+    augment: bool = False,
+    l2: float = 0.0,
     prefer_weights: str = "best",
     force_model_path: Path | None = None,
     imbalanced_training: bool = False,
     weighted_loss: bool = False,
+    write_predictions: bool = True,
+    use_fixmatch: bool = False,
 ):
     run_config = RunConfig(
         model_version=model_version,
         target_types=target_types,
         train_size=train_size,
+        labeled_fraction=labeled_fraction,
         batch_size=batch_size,
         stratify=stratify,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
         imbalanced_training=imbalanced_training,
         weighted_loss=weighted_loss,
+        augment=augment,
+        l2=l2,
+        use_fixmatch=use_fixmatch,
+        use_pseudolabels=use_pseudolabels,
+        pseudolabel_threshold=pseudolabel_threshold,
+        pseudolabel_weight=pseudolabel_weight,
+        pseudolabel_start_epoch=pseudolabel_start_epoch,
     )
-    run_dir = get_run_dir(run_config)
-    model_path = resolve_model_path_for_predict(run_dir, prefer=prefer_weights)
     num_outputs = 2 if target_types == "binary-category" else 37
     if force_model_path and force_model_path.exists():
-        logger.info(f"Using forced model path: {force_model_path}")
+        logger.warning(f"Force model path provided: {force_model_path}")
+        run_dir = force_model_path.parent.parent
         model_path = force_model_path
+    else:
+        run_dir = get_run_dir(run_config)
+        model_path = resolve_model_path_for_predict(run_dir, prefer=prefer_weights)
+    run_dir = run_dir.resolve()
+    model_path = model_path.resolve()
 
     logger.info(f"Loading model weights from {model_path}")
     model, _ = get_model(model_version=model_version, use_weights=False)
     model.classifier[1] = nn.Linear(cast(nn.Linear, model.classifier[1]).in_features, num_outputs)
-    model.load_state_dict(torch.load(model_path, weights_only=True))
-    model.eval()
-
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+    model.eval()
     model.to(device)
+
 
     # use the same number of classes as model outputs
     num_classes = num_outputs
@@ -72,12 +95,15 @@ def main(
     all_preds = []
     all_labels = []
     incorrect_predictions = []
+    prediction_rows: list[dict[str, object]] = []
     for images, labels, paths in tqdm(val_loader, desc="Predicting"):
         with torch.no_grad():
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
 
             preds = outputs.argmax(dim=1)
+            probs = torch.softmax(outputs, dim=1)
+            confs = probs[torch.arange(outputs.size(0), device=outputs.device), preds]
 
             wrong_mask = preds != labels
             for i in torch.where(wrong_mask)[0]:
@@ -87,9 +113,20 @@ def main(
                         "path": paths[i],
                         "true": labels[i].item(),
                         "pred": preds[i].item(),
-                        "confidence": torch.softmax(outputs[i], dim=0)[preds[i]].item(),
+                        "confidence": probs[i, preds[i]].item(),
                     }
                 )
+
+            if write_predictions:
+                for i in range(outputs.size(0)):
+                    prediction_rows.append(
+                        {
+                            "path": paths[i],
+                            "true": int(labels[i].item()),
+                            "pred": int(preds[i].item()),
+                            "confidence": float(confs[i].item()),
+                        }
+                    )
 
             # per-class counting: count correct predictions for each class
             for clas in range(num_classes):
@@ -123,6 +160,37 @@ def main(
     print(f"F1 ({average_mode}): {f1:.4f}")
     for clas in range(num_classes):
         print(f"Class {clas} accuracy: {per_class_acc[clas]}")
+
+    if write_predictions:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        tag = "forced" if force_model_path else prefer_weights
+        out_path = run_dir / f"predictions_{tag}.csv"
+        with out_path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=["path", "true", "pred", "confidence"])
+            writer.writeheader()
+            writer.writerows(prediction_rows)
+        logger.success(f"Wrote predictions to {out_path}")
+
+        stats_path = run_dir / f"prediction_stats_{tag}.json"
+        if force_model_path:
+            model_path_str = ""
+        else:
+            try:
+                model_path_str = str(model_path.resolve().relative_to(MODELS_DIR.resolve()))
+            except ValueError:
+                model_path_str = str(model_path.resolve())
+            
+        stats = {
+            "model_path": model_path_str,
+            "prefer_weights": prefer_weights,
+            "forced_model_path": str(force_model_path) if force_model_path else None,
+            "accuracy": float(accuracy),
+            "f1": float(f1),
+            "f1_average": average_mode,
+            "per_class_accuracy": {str(k): float(v) for k, v in per_class_acc.items()},
+        }
+        stats_path.write_text(json.dumps(stats, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        logger.success(f"Wrote prediction stats to {stats_path}")
 
     if False:  # debug
         print("\nIncorrect predictions:")
