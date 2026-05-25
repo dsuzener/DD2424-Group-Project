@@ -17,7 +17,9 @@ classifiers = [
 ]
 dependencies = [
     "loguru",
+    "matplotlib>=3.10.9",
     "mkdocs",
+    "modal>=1.4.3",
     "pip",
     "pytest",
     "python-dotenv",
@@ -27,7 +29,12 @@ dependencies = [
     "tqdm",
     "typer",
 ]
-requires-python = "~=3.14.0"
+requires-python = ">=3.11,<3.15"
+
+[project.optional-dependencies]
+modal = [
+    "modal>=0.65.0",
+]
 
 
 [tool.ruff]
@@ -41,4 +48,3 @@ extend-select = ["I"]  # Add import sorting
 [tool.ruff.lint.isort]
 known-first-party = ["pawnet"]
 force-sort-within-sections = true
-
