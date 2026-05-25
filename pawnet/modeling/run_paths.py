@@ -44,6 +44,8 @@ class RunConfig:
     stratify: bool
     num_layers: int
     gradual_unfreezing: bool
+    imbalanced_training: bool
+    weighted_loss: bool
     augment: bool = False
     l2: float = 0.0
     use_pseudolabels: bool = False
@@ -75,6 +77,10 @@ class RunConfig:
                 ]
             )
         parts.append(f"fixmatch={int(self.use_fixmatch)}")
+        if self.imbalanced_training:
+            parts.append(f"imbalanced={int(self.imbalanced_training)}")
+        if self.weighted_loss:
+            parts.append(f"weighted={int(self.weighted_loss)}")
         return parts
 
 # function to get run dir path from config (doesn't create)

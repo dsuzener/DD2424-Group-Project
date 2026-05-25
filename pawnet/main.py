@@ -30,6 +30,9 @@ def main(
     l2: float = 0.0,
     use_fixmatch: bool = False,
     force_model_path: Path | None = None,
+    imbalanced_training: bool = False,
+    weighted_loss: bool = False,
+    
 ):
     print("Hello from dd2424-group-project!")
 
@@ -42,6 +45,8 @@ def main(
         train_size=train_size,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        imbalanced_training=False,
+        weighted_loss=False,
         labeled_fraction=labeled_fraction,
     )
     trainval_result = dataset(
@@ -52,6 +57,8 @@ def main(
         batch_size=batch_size,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        imbalanced_training=imbalanced_training,
+        weighted_loss=weighted_loss,
         labeled_fraction=labeled_fraction,
         augment=augment,
         use_fixmatch=use_fixmatch,
@@ -75,6 +82,8 @@ def main(
             batch_size=batch_size,
             stratify=stratify,
             gradual_unfreezing=gradual_unfreezing,
+            imbalanced_training=imbalanced_training,
+            weighted_loss=weighted_loss,
             labeled_fraction=labeled_fraction,
             use_pseudolabels=use_pseudolabels,
             pseudolabel_threshold=pseudolabel_threshold,
@@ -94,6 +103,9 @@ def main(
         num_layers=num_layers,
         force_model_path=force_model_path,
         gradual_unfreezing=gradual_unfreezing,
+        imbalanced_training=imbalanced_training,
+        weighted_loss=weighted_loss,
+        # force_model_path=Path("models/baseline/efficientnet_b2/model_9891.pkl"),
         labeled_fraction=labeled_fraction,
         use_pseudolabels=use_pseudolabels,
         pseudolabel_threshold=pseudolabel_threshold,

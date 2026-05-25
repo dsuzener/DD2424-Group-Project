@@ -43,6 +43,8 @@ def main(
     l2: float = 0.0,
     prefer_weights: str = "best",
     force_model_path: Path | None = None,
+    imbalanced_training: bool = False,
+    weighted_loss: bool = False,
     write_predictions: bool = True,
     use_fixmatch: bool = False,
 ):
@@ -55,6 +57,8 @@ def main(
         stratify=stratify,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        imbalanced_training=imbalanced_training,
+        weighted_loss=weighted_loss,
         augment=augment,
         l2=l2,
         use_fixmatch=use_fixmatch,

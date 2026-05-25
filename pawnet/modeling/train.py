@@ -20,7 +20,15 @@ from pawnet.modeling.run_paths import RunConfig, ensure_run_dir, find_latest_che
 
 app = typer.Typer()
 
-
+def compute_class_weights(train_loader, num_classes: int, device):
+    counts = torch.zeros(num_classes)
+    for _, labels, _ in train_loader:
+        counts += torch.bincount(labels, minlength=num_classes)
+    weights = 1.0 / counts
+    weights = weights / weights.mean() # Normalize
+    
+    return weights.to(device)
+    
 @app.command()
 def main(
     train_loader,
@@ -36,6 +44,8 @@ def main(
     batch_size: int = 128,
     stratify: bool = True,
     gradual_unfreezing: bool = False,
+    imbalanced_training=False,
+    weighted_loss=False,
     labeled_fraction: float = 1.0,
     use_pseudolabels: bool = False,
     pseudolabel_threshold: float = 0.9,
@@ -56,6 +66,8 @@ def main(
         stratify=stratify,
         num_layers=num_layers,
         gradual_unfreezing=gradual_unfreezing,
+        imbalanced_training=imbalanced_training,
+        weighted_loss=weighted_loss,
         augment=augment,
         l2=l2,
         use_pseudolabels=use_pseudolabels,
@@ -141,7 +153,11 @@ def main(
     model.to(device)
 
     # Define loss function and optimizer
-    criterion = nn.CrossEntropyLoss(weight=None)  # TODO: weights
+    if weighted_loss: # TODO
+        class_weights = compute_class_weights(train_loader, num_outputs, device)
+        criterion = nn.CrossEntropyLoss(weight=class_weights)  
+    else:
+        criterion = nn.CrossEntropyLoss(weight=None)  
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
 
     # for storing metrics
